@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables (NEVER commit these)
+.env
+.env.local
+.env.production
+
+# Vite cache
+.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Large binary assets already in public/
+# (the Video.mp4 in root can be removed once it's in public/)
+Video.mp4
