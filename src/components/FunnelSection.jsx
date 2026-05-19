@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { motion, useScroll, useTransform, useInView } from 'motion/react'
+import { useRef } from 'react'
+import { motion, useInView } from 'motion/react'
 import { Target, Cpu, CheckCircle2, ArrowDown } from 'lucide-react'
 
 const steps = [
@@ -53,12 +53,12 @@ function StepCard({ step, index }) {
     <motion.div
       ref={ref}
       className="relative"
-      initial={{ opacity: 0, x: index % 2 === 0 ? -40 : 40 }}
-      animate={isInView ? { opacity: 1, x: 0 } : {}}
+      initial={{ opacity: 0, y: 30 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.7, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
     >
       <div
-        className="relative rounded-2xl border overflow-hidden p-8 md:p-10"
+        className="relative rounded-2xl border overflow-hidden p-6 md:p-10"
         style={{
           borderColor: 'rgba(255,255,255,0.08)',
           background: 'rgba(255,255,255,0.025)',
@@ -70,57 +70,58 @@ function StepCard({ step, index }) {
           style={{ background: step.glow }}
         />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-start gap-6">
-          {/* Left: number + icon */}
-          <div className="flex-shrink-0 flex flex-col items-center md:items-start gap-3">
+        <div className="relative z-10 flex flex-col items-center text-center md:flex-row md:items-start md:text-left gap-6">
+
+          {/* Icon + number — centered on mobile */}
+          <div className="flex-shrink-0 flex flex-row md:flex-col items-center gap-4 md:gap-3">
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center border"
-              style={{
-                background: `${step.color}15`,
-                borderColor: `${step.color}25`,
-              }}
+              className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center border"
+              style={{ background: `${step.color}15`, borderColor: `${step.color}25` }}
             >
-              <Icon size={24} style={{ color: step.color }} />
+              <Icon size={22} style={{ color: step.color }} />
             </div>
             <div
-              className="font-mono text-5xl font-bold leading-none select-none"
-              style={{ color: `${step.color}15` }}
+              className="font-mono text-4xl md:text-5xl font-bold leading-none select-none"
+              style={{ color: `${step.color}18` }}
               aria-hidden="true"
             >
               {step.number}
             </div>
           </div>
 
-          {/* Right: content */}
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
-              <div>
-                <span
-                  className="text-xs font-medium uppercase tracking-widest"
-                  style={{ color: step.color }}
-                >
-                  {step.label}
-                </span>
-                <h3 className="text-xl md:text-2xl font-semibold text-white mt-1">
-                  {step.title}
-                </h3>
-              </div>
-              {/* Metric badge */}
-              <div
-                className="flex flex-col items-center px-4 py-3 rounded-xl border max-w-[160px] text-center"
-                style={{ borderColor: `${step.color}20`, background: `${step.color}08` }}
-              >
-                <span className="text-xl font-bold leading-tight" style={{ color: step.color }}>
-                  {step.metric.value}
-                </span>
-                <span className="text-xs text-[#8A8F98] whitespace-nowrap">{step.metric.label}</span>
-              </div>
+          {/* Content */}
+          <div className="flex-1 w-full">
+            {/* Label */}
+            <span
+              className="text-xs font-medium uppercase tracking-widest"
+              style={{ color: step.color }}
+            >
+              {step.label}
+            </span>
+
+            {/* Title */}
+            <h3 className="text-xl md:text-2xl font-semibold text-white mt-1 mb-4">
+              {step.title}
+            </h3>
+
+            {/* Metric badge — full width on mobile, inline on desktop */}
+            <div
+              className="flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-xl border mb-4 md:inline-flex md:w-auto w-full"
+              style={{ borderColor: `${step.color}20`, background: `${step.color}08` }}
+            >
+              <span className="text-xl font-bold leading-tight" style={{ color: step.color }}>
+                {step.metric.value}
+              </span>
+              <span className="text-xs text-[#8A8F98]">{step.metric.label}</span>
             </div>
 
-            <p className="text-[#8A8F98] leading-relaxed mb-6">{step.description}</p>
+            {/* Description */}
+            <p className="text-[#8A8F98] leading-relaxed mb-5 text-sm md:text-base">
+              {step.description}
+            </p>
 
             {/* Tools */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap justify-center md:justify-start gap-2">
               {step.tools.map(tool => (
                 <span
                   key={tool}
@@ -142,24 +143,14 @@ function StepCard({ step, index }) {
   )
 }
 
-function ConnectorArrow({ index }) {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true })
-
+function ConnectorArrow() {
   return (
-    <motion.div
-      ref={ref}
-      className="flex justify-center py-2"
-      initial={{ opacity: 0, y: -10 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.4, delay: 0.3, ease: 'easeOut' }}
-      aria-hidden="true"
-    >
+    <div className="flex justify-center py-2" aria-hidden="true">
       <div className="flex flex-col items-center gap-1">
         <div className="w-px h-8 bg-gradient-to-b from-white/10 to-white/4" />
         <ArrowDown size={14} className="text-white/20" />
       </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -168,12 +159,12 @@ export default function FunnelSection() {
   const isInView = useInView(ref, { once: true, margin: '-100px' })
 
   return (
-    <section id="embudo" className="py-24 md:py-32 relative overflow-hidden" aria-labelledby="embudo-title">
-      <div className="max-w-4xl mx-auto px-6">
+    <section id="embudo" className="py-20 md:py-32 relative overflow-hidden" aria-labelledby="embudo-title">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <motion.div
           ref={ref}
-          className="text-center mb-16"
+          className="text-center mb-12 md:mb-16"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
@@ -187,7 +178,7 @@ export default function FunnelSection() {
               en automático
             </span>
           </h2>
-          <p className="text-[#8A8F98] text-lg max-w-xl mx-auto leading-relaxed">
+          <p className="text-[#8A8F98] text-base md:text-lg max-w-xl mx-auto leading-relaxed">
             Tres fases interconectadas que trabajan las 24 horas para llenar tu pipeline
             sin que muevas un dedo.
           </p>
@@ -198,7 +189,7 @@ export default function FunnelSection() {
           {steps.map((step, index) => (
             <div key={step.id}>
               <StepCard step={step} index={index} />
-              {index < steps.length - 1 && <ConnectorArrow index={index} />}
+              {index < steps.length - 1 && <ConnectorArrow />}
             </div>
           ))}
         </div>

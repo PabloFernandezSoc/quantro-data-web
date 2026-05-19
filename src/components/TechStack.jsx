@@ -128,24 +128,21 @@ const tools = [
   },
 ]
 
-const gridConfig = {
-  '2x1': 'md:col-span-2',
-  '1x1': 'md:col-span-1',
-  '1x2': 'md:row-span-2',
-}
-
 function ToolCard({ tool, index }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-60px' })
 
+  // 2x1 cards span full width on mobile (col-span-2), half on desktop (md:col-span-2 of 4)
+  const spanClass = tool.size === '2x1' ? 'col-span-2' : 'col-span-1'
+
   return (
     <motion.div
       ref={ref}
-      className={`group relative rounded-2xl border overflow-hidden cursor-default ${gridConfig[tool.size] || ''}`}
+      className={`group relative rounded-2xl border overflow-hidden cursor-default ${spanClass}`}
       style={{
         background: 'rgba(255,255,255,0.025)',
         borderColor: 'rgba(255,255,255,0.07)',
-        minHeight: tool.size === '1x1' ? 140 : 'auto',
+        minHeight: 140,
       }}
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
@@ -153,33 +150,28 @@ function ToolCard({ tool, index }) {
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
     >
       {/* Hover glow */}
-      <motion.div
+      <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{ background: `radial-gradient(circle at 30% 30%, ${tool.color}10, transparent 70%)` }}
       />
 
-      <div className="relative z-10 p-6 h-full flex flex-col justify-between">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-3">
-            <div className="w-12 h-12 flex items-center justify-center" aria-hidden="true">
-              {tool.icon}
-            </div>
-            <div>
-              <div className="font-semibold text-white text-base">{tool.name}</div>
-              <div className="text-xs mt-0.5" style={{ color: tool.color }}>
-                {tool.category}
-              </div>
-            </div>
+      <div className="relative z-10 p-5 md:p-6 h-full flex flex-col justify-between">
+        <div className="flex flex-col gap-3">
+          <div className="w-12 h-12 flex items-center justify-center" aria-hidden="true">
+            {tool.icon}
+          </div>
+          <div>
+            <div className="font-semibold text-white text-sm md:text-base">{tool.name}</div>
+            <div className="text-xs mt-0.5" style={{ color: tool.color }}>{tool.category}</div>
           </div>
         </div>
-
         {tool.description && (
-          <p className="text-sm text-[#8A8F98] leading-relaxed mt-3">{tool.description}</p>
+          <p className="text-xs md:text-sm text-[#8A8F98] leading-relaxed mt-3">{tool.description}</p>
         )}
       </div>
 
       {/* Border accent on hover */}
-      <motion.div
+      <div
         className="absolute inset-0 rounded-2xl border-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{ borderColor: `${tool.color}25` }}
       />
@@ -192,11 +184,11 @@ export default function TechStack() {
   const isInView = useInView(ref, { once: true, margin: '-100px' })
 
   return (
-    <section id="stack" className="py-24 md:py-32 relative" aria-labelledby="stack-title">
-      <div className="max-w-6xl mx-auto px-6">
+    <section id="stack" className="py-20 md:py-32 relative" aria-labelledby="stack-title">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <motion.div
           ref={ref}
-          className="text-center mb-16"
+          className="text-center mb-12 md:mb-16"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
@@ -210,13 +202,14 @@ export default function TechStack() {
               en las manos correctas
             </span>
           </h2>
-          <p className="text-[#8A8F98] text-lg max-w-xl mx-auto">
+          <p className="text-[#8A8F98] text-base md:text-lg max-w-xl mx-auto">
             Dominamos el ecosistema completo de automatización y growth para construir sistemas
             que funcionan sin supervisión constante.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Grid: 2 cols mobile, 4 cols desktop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {tools.map((tool, i) => (
             <ToolCard key={tool.name} tool={tool} index={i} />
           ))}
