@@ -88,7 +88,7 @@ export default function Hero() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
-          Consultoría en Automatización &amp; Growth · Chile
+          Tu partner de Growth · Paid Media · Contenido · Automatización · Chile
         </motion.div>
 
         {/* Headline */}
@@ -98,7 +98,7 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
         >
-          Automatizamos tu crecimiento{' '}
+          Hacemos crecer tu negocio{' '}
           <br className="hidden sm:block" />
           <span
             className="text-transparent bg-clip-text"
@@ -106,10 +106,10 @@ export default function Hero() {
               backgroundImage: 'linear-gradient(135deg, #818CF8 0%, #A78BFA 50%, #6366F1 100%)',
             }}
           >
-            desde el primer clic
+            del primer clic
           </span>
           <br className="hidden sm:block" />
-          hasta el cierre de ventas
+          al cierre de ventas
         </motion.h1>
 
         {/* Subheadline */}
@@ -119,8 +119,8 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
-          Diseñamos embudos inteligentes que combinan paid media, automatización con IA y CRM
-          para convertir audiencias en clientes de forma predecible y escalable.
+          Paid media, contenido, automatización con IA y CRM. Tomamos un servicio puntual
+          o tu sistema de crecimiento completo — el alcance lo defines tú.
         </motion.p>
 
         {/* CTAs */}

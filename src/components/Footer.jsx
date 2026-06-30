@@ -1,4 +1,5 @@
-import { Zap, Mail } from 'lucide-react'
+import { Mail } from 'lucide-react'
+import Logo from './Logo'
 
 const LinkedinIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -25,14 +26,7 @@ export default function Footer() {
     <footer className="border-t py-12" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
-              <Zap size={14} className="text-indigo-400" />
-            </div>
-            <span className="font-semibold text-white text-sm tracking-tight">
-              Quantro <span className="text-indigo-400">Data</span>
-            </span>
-          </div>
+          <Logo size={28} />
 
           <p className="text-xs text-[#4A505A] text-center">
             © {new Date().getFullYear()} Quantro Data. Automatización &amp; Growth Intelligence.

@@ -16,10 +16,14 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Editor
+# Editor / tooling
 .vscode/
 .idea/
+.claude/
+.agents/
 
-# Large binary assets already in public/
-# (the Video.mp4 in root can be removed once it's in public/)
-Video.mp4
+# Duplicado del video en la raíz (el real vive en public/ y SÍ se commitea
+# para que el deploy desde GitHub sea autónomo)
+/Video.mp4
+
+.vercel

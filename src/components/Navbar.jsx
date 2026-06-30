@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
-import { Menu, X, Zap } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
+import Logo from './Logo'
 
 const links = [
-  { label: 'Servicios', href: '#embudo' },
-  { label: 'Herramientas', href: '#stack' },
+  { label: 'Servicios', href: '#servicios' },
+  { label: 'Workflows', href: '#workflows' },
   { label: 'Proceso', href: '#proceso' },
+  { label: 'FAQ', href: '#faq' },
   { label: 'Contacto', href: '#contacto' },
 ]
 
@@ -34,13 +36,12 @@ export default function Navbar() {
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
     >
       <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <a href="#" className="flex items-center gap-2 group" aria-label="Quantro Data inicio">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center group-hover:bg-indigo-500/30 transition-colors duration-200">
-            <Zap size={16} className="text-indigo-400" />
-          </div>
-          <span className="font-semibold text-white tracking-tight">
-            Quantro <span className="text-indigo-400">Data</span>
-          </span>
+        <a
+          href="#"
+          className="flex items-center group transition-transform duration-200 hover:scale-[1.02]"
+          aria-label="Quantro Data inicio"
+        >
+          <Logo size={32} />
         </a>
 
         <ul className="hidden md:flex items-center gap-1" role="list">
