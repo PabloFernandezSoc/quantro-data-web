@@ -1,63 +1,37 @@
 import { useRef } from 'react'
 import { motion, useInView, useMotionValue, useSpring } from 'motion/react'
-import { Megaphone, Clapperboard, Bot, Database, LineChart, Target, ArrowRight } from 'lucide-react'
+import { Megaphone, Clapperboard, Bot, Sparkles, ArrowRight } from 'lucide-react'
 import WordReveal from './fx/WordReveal'
 import GhostTitle from './fx/GhostTitle'
 
+// Tres pilares claros — todo lo que hacemos cabe en uno de estos frentes.
 const services = [
+  {
+    icon: Clapperboard,
+    title: 'Contenido & Creatividad',
+    tagline: 'Tu marca, constante y profesional.',
+    description:
+      'Grilla mensual, guiones y edición de tus reels y shorts. Partimos analizando a tu competencia para que cada pieza salga a competir con ventaja.',
+    tags: ['Grilla mensual', 'Guiones', 'Edición de video', 'Análisis de competencia'],
+    color: '#EC4899',
+  },
   {
     icon: Megaphone,
     title: 'Paid Media',
     tagline: 'Campañas que traen clientes, no solo clics.',
     description:
-      'Diseñamos, lanzamos y optimizamos tus campañas en Meta y Google Ads. Segmentación afilada, creatividades que convierten y reporting claro de cada peso invertido.',
+      'Diseñamos, lanzamos y optimizamos tus campañas en Meta y Google Ads. Segmentación afilada, creatividades testeadas y reporting claro de cada peso invertido.',
     tags: ['Meta Ads', 'Google Ads', 'Retargeting', 'Reporting'],
     color: '#6366F1',
   },
   {
-    icon: Clapperboard,
-    title: 'Contenido & Video',
-    tagline: 'Tu marca, constante y profesional.',
-    description:
-      'Planificamos tu grilla mensual, producimos y editamos tus reels, shorts y piezas. Tu feed siempre activo, con guion, ritmo y estética que enamoran.',
-    tags: ['Grilla mensual', 'Edición', 'Reels / Shorts', 'Guion'],
-    color: '#EC4899',
-  },
-  {
     icon: Bot,
-    title: 'Automatización & IA',
-    tagline: 'Flujos que trabajan mientras duermes.',
+    title: 'Automatización & Optimización',
+    tagline: 'Le devolvemos horas a tu equipo.',
     description:
-      'Construimos automatizaciones que califican, responden y dan seguimiento solas. La IA de Claude personaliza cada interacción y elimina el trabajo manual repetitivo.',
-    tags: ['n8n', 'Python', 'Claude AI', 'Webhooks'],
+      'Con n8n y Python intervenimos las gestiones que hoy consumen tiempo humano: email marketing, notificaciones a clientes y la optimización de tu flujo publicitario.',
+    tags: ['n8n', 'Python', 'Email marketing', 'Notificaciones'],
     color: '#8B5CF6',
-  },
-  {
-    icon: Database,
-    title: 'CRM & Seguimiento',
-    tagline: 'Ningún lead se enfría ni se pierde.',
-    description:
-      'Ordenamos tu pipeline y montamos flujos de seguimiento por WhatsApp y email que empujan a cada prospecto hacia el cierre, sin que tengas que recordarlo.',
-    tags: ['HubSpot', 'Pipedrive', 'WhatsApp API'],
-    color: '#22C55E',
-  },
-  {
-    icon: LineChart,
-    title: 'Datos & Analítica',
-    tagline: 'Decide con certeza, no con corazonadas.',
-    description:
-      'Conectamos tu tracking y armamos dashboards en tiempo real para que sepas exactamente qué funciona, qué escalar y dónde está tu próxima oportunidad.',
-    tags: ['GA4', 'Looker Studio', 'Dashboards'],
-    color: '#06B6D4',
-  },
-  {
-    icon: Target,
-    title: 'Estrategia de Growth',
-    tagline: 'Un partner, no un proveedor más.',
-    description:
-      'Auditamos tu situación, definimos un roadmap con prioridades reales y te acompañamos en la ejecución. Pensamos tu crecimiento como si fuera nuestro.',
-    tags: ['Auditoría', 'Roadmap', 'Consultoría'],
-    color: '#F59E0B',
   },
 ]
 
@@ -174,17 +148,17 @@ export default function ServicesSection() {
             Servicios
           </span>
           <h2 id="servicios-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
-            <WordReveal text="No solo automatización." />{' '}
+            <WordReveal text="Un objetivo:" />{' '}
             <WordReveal
-              text="Growth de punta a punta"
-              delay={0.18}
-              className="text-transparent bg-clip-text"
+              text="tu crecimiento"
+              delay={0.16}
+              className="serif-italic text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
             />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg leading-relaxed">
-            Desde traer a los clientes correctos hasta producir el contenido que los enamora.
-            Toma un servicio puntual o combínalos en un sistema completo — el alcance lo defines tú.
+            Tres frentes, un solo partner. Toma uno puntual o combínalos —
+            los ajustamos a la etapa de tu negocio.
           </p>
         </motion.div>
 
@@ -195,22 +169,32 @@ export default function ServicesSection() {
           ))}
         </div>
 
-        {/* Modular note */}
+        {/* Declaración de IA + criterio humano */}
         <motion.div
-          className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-center"
-          initial={{ opacity: 0, y: 16 }}
+          className="liquid-glass mt-8 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-5 md:gap-8"
+          initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
         >
-          <p className="text-sm text-[#8A8F98]">
-            ¿No ves tu necesidad exacta? Armamos un plan a tu medida.
-          </p>
+          <div className="w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center flex-shrink-0">
+            <Sparkles size={22} className="text-indigo-400" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h3 className="text-white font-semibold text-lg mb-1.5">
+              IA en el proceso, <span className="serif-italic text-indigo-300">criterio humano</span> en cada decisión
+            </h3>
+            <p className="text-sm md:text-base text-[#8A8F98] leading-relaxed">
+              Estudiamos a tu competencia, convertimos los hallazgos en contexto para modelos
+              como Claude y optimizamos cada flujo de trabajo. La IA nos hace más rápidos —
+              nuestro criterio decide qué vale la pena crear.
+            </p>
+          </div>
           <a
-            href="#contacto"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-300 hover:text-indigo-200 transition-colors cursor-pointer"
+            href="/vision"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-300 hover:text-indigo-200 transition-colors cursor-pointer whitespace-nowrap"
           >
-            Conversemos
+            Conoce cómo pensamos
             <ArrowRight size={15} />
           </a>
         </motion.div>

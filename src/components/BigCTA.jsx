@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowUpRight } from 'lucide-react'
 import WordReveal from './fx/WordReveal'
 import Magnetic from './fx/Magnetic'
+import NeuralCanvas from './fx/NeuralCanvas'
 
 // Mega-CTA estilo agencia: tipografía gigante + botón magnético.
 export default function BigCTA() {
@@ -12,6 +13,11 @@ export default function BigCTA() {
 
   return (
     <section ref={ref} className="relative py-28 md:py-44 overflow-hidden" aria-labelledby="bigcta-title">
+      {/* Red neuronal de fondo (heredada del hero original) */}
+      <div className="absolute inset-0 opacity-60" aria-hidden="true">
+        <NeuralCanvas />
+      </div>
+
       {/* Glow que crece con el scroll */}
       <motion.div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] blur-[180px] pointer-events-none opacity-25"

@@ -1,10 +1,9 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, TrendingUp, Cpu, Users } from 'lucide-react'
 import WordReveal from './fx/WordReveal'
 import Counter from './fx/Counter'
 import Magnetic from './fx/Magnetic'
-import NeuralCanvas from './fx/NeuralCanvas'
 
 const stats = [
   { icon: TrendingUp, value: 4.8, prefix: '$', suffix: 'M', decimals: 1, unit: 'CLP/mes', label: 'promedio en nuevas oportunidades' },
@@ -14,6 +13,7 @@ const stats = [
 
 export default function Hero() {
   const ref = useRef(null)
+  const videoRef = useRef(null)
 
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
   const bgScale     = useTransform(scrollYProgress, [0, 1], [1, 1.12])
@@ -21,19 +21,82 @@ export default function Hero() {
   const contentY    = useTransform(scrollYProgress, [0, 1], [0, 100])
   const contentOpac = useTransform(scrollYProgress, [0, 0.6], [1, 0])
 
+  // Loop con crossfade a negro: el video hace fade-out al terminar,
+  // reinicia y vuelve con fade-in — sin el corte seco del loop nativo.
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    let raf = 0
+    let fading = false
+
+    const fade = (from, to, ms, done) => {
+      const t0 = performance.now()
+      const step = now => {
+        const p = Math.min((now - t0) / ms, 1)
+        v.style.opacity = String(from + (to - from) * p)
+        if (p < 1) raf = requestAnimationFrame(step)
+        else done?.()
+      }
+      raf = requestAnimationFrame(step)
+    }
+
+    const onCanPlay = () => {
+      v.play().catch(() => {})
+      fade(0, 1, 500)
+    }
+    const onTime = () => {
+      if (!fading && v.duration && v.duration - v.currentTime <= 0.55) {
+        fading = true
+        fade(parseFloat(v.style.opacity || '1'), 0, 500)
+      }
+    }
+    const onEnded = () => {
+      v.style.opacity = '0'
+      setTimeout(() => {
+        v.currentTime = 0
+        v.play().catch(() => {})
+        fading = false
+        fade(0, 1, 500)
+      }, 100)
+    }
+
+    v.addEventListener('canplay', onCanPlay, { once: true })
+    v.addEventListener('timeupdate', onTime)
+    v.addEventListener('ended', onEnded)
+    return () => {
+      cancelAnimationFrame(raf)
+      v.removeEventListener('canplay', onCanPlay)
+      v.removeEventListener('timeupdate', onTime)
+      v.removeEventListener('ended', onEnded)
+    }
+  }, [])
+
   return (
     <section
       ref={ref}
       className="relative min-h-dvh flex flex-col items-center justify-center overflow-hidden pt-16"
       aria-label="Hero section"
     >
-      {/* ── Fondo generativo: red neuronal reactiva ─────────── */}
+      {/* ── Video de fondo con loop crossfade ───────────────── */}
       <motion.div
         className="absolute inset-0 z-0"
         style={{ scale: bgScale, opacity: bgOpacity }}
       >
-        <NeuralCanvas />
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          src="/videos/hero.mp4"
+          muted
+          autoPlay
+          playsInline
+          preload="auto"
+          style={{ opacity: 0 }}
+          aria-hidden="true"
+        />
       </motion.div>
+
+      {/* Base oscura para legibilidad del texto */}
+      <div className="absolute inset-0 z-10 bg-black/55" aria-hidden="true" />
       {/* Gradient vignette for cinematic depth */}
       <div
         className="absolute inset-0 z-10 pointer-events-none"
@@ -54,17 +117,6 @@ export default function Hero() {
         aria-hidden="true"
       />
 
-      {/* ── Scan-line texture ───────────────────────────────── */}
-      <div
-        className="absolute inset-0 z-10 pointer-events-none opacity-[0.025]"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 3px)',
-          backgroundSize: '100% 3px',
-        }}
-        aria-hidden="true"
-      />
-
       {/* ── Content ─────────────────────────────────────────── */}
       <motion.div
         className="relative z-20 max-w-5xl mx-auto px-6 text-center"
@@ -78,21 +130,20 @@ export default function Hero() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
-          Tu partner de Growth · Paid Media · Contenido · Automatización · Chile
+          Growth partner para negocios digitales · Chile
         </motion.div>
 
-        {/* Headline — reveal palabra por palabra */}
+        {/* Headline — reveal palabra por palabra con acento serif */}
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold leading-[1.08] mb-6 drop-shadow-xl">
-          <WordReveal text="Hacemos crecer tu negocio" delay={0.1} />{' '}
-          <br className="hidden sm:block" />
+          <WordReveal text="Somos el" delay={0.1} />{' '}
           <WordReveal
-            text="del primer clic"
-            delay={0.32}
-            className="text-transparent bg-clip-text"
-            style={{ backgroundImage: 'linear-gradient(135deg, #818CF8 0%, #A78BFA 50%, #6366F1 100%)' }}
-          />{' '}
-          <br className="hidden sm:block" />
-          <WordReveal text="al cierre de ventas" delay={0.48} />
+            text="growth partner"
+            delay={0.26}
+            className="serif-italic text-transparent bg-clip-text"
+            style={{ backgroundImage: 'linear-gradient(135deg, #A5B4FC 0%, #C4B5FD 60%, #818CF8 100%)' }}
+          />
+          <br className="hidden sm:block" />{' '}
+          <WordReveal text="de tu negocio digital" delay={0.46} />
         </h1>
 
         {/* Subheadline */}
@@ -102,8 +153,8 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
-          Paid media, contenido, automatización con IA y CRM. Tomamos un servicio puntual
-          o tu sistema de crecimiento completo — el alcance lo defines tú.
+          Contenido, paid media y automatización trabajando juntos.
+          Potenciado con IA, decidido con criterio humano.
         </motion.p>
 
         {/* CTAs */}

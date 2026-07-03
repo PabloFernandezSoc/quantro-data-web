@@ -5,12 +5,12 @@ import { supabase } from '../lib/supabase'
 import WordReveal from './fx/WordReveal'
 
 const services = [
-  'Automatización de marketing',
-  'Paid media (Google/Meta)',
-  'Integración de CRM',
-  'Chatbots con IA',
-  'Análisis de datos / BI',
-  'Consultoría estratégica',
+  'Contenido & video (grilla, guiones, edición)',
+  'Paid media (Meta / Google)',
+  'Automatización & optimización (n8n, Python)',
+  'Email marketing / notificaciones',
+  'Estrategia de growth',
+  'Aún no lo sé — necesito un diagnóstico',
 ]
 
 function InputField({ label, id, type = 'text', required, placeholder, children }) {
