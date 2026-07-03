@@ -64,20 +64,30 @@ function ServiceCard({ service, index }) {
   const isInView = useInView(ref, { once: true, margin: '-60px' })
   const Icon = service.icon
 
+  // Spotlight: el glow sigue la posición del cursor dentro de la tarjeta
+  function onMove(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    e.currentTarget.style.setProperty('--mx', `${e.clientX - rect.left}px`)
+    e.currentTarget.style.setProperty('--my', `${e.clientY - rect.top}px`)
+  }
+
   return (
     <motion.div
       ref={ref}
       className="group relative rounded-2xl border overflow-hidden p-6 md:p-7"
       style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'rgba(255,255,255,0.07)' }}
+      onMouseMove={onMove}
       initial={{ opacity: 0, y: 24 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.55, delay: index * 0.07, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
     >
-      {/* Hover glow */}
+      {/* Spotlight que sigue al cursor */}
       <div
-        className="absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-        style={{ background: `${service.color}22` }}
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{
+          background: `radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), ${service.color}18, transparent 65%)`,
+        }}
       />
 
       <div className="relative z-10">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { motion, useScroll, useTransform } from 'motion/react'
+import { motion, useScroll, useSpring } from 'motion/react'
 import { Menu, X } from 'lucide-react'
 import Logo from './Logo'
 
@@ -14,16 +14,24 @@ const links = [
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const { scrollY } = useScroll()
+  const [hidden, setHidden] = useState(false)
+  const { scrollY, scrollYProgress } = useScroll()
+  const progressX = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
 
   useEffect(() => {
-    const unsub = scrollY.on('change', v => setScrolled(v > 40))
+    let last = 0
+    const unsub = scrollY.on('change', v => {
+      setScrolled(v > 40)
+      // Ocultar al bajar, mostrar al subir (nunca con el menú abierto)
+      setHidden(v > 160 && v > last && !open)
+      last = v
+    })
     return unsub
-  }, [scrollY])
+  }, [scrollY, open])
 
   return (
     <motion.header
-      className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+      className="fixed top-0 left-0 right-0 z-50"
       style={{
         background: scrolled
           ? 'rgba(5, 5, 6, 0.85)'
@@ -32,9 +40,18 @@ export default function Navbar() {
         borderBottom: scrolled ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent',
       }}
       initial={{ y: -80, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      animate={{ y: hidden ? -80 : 0, opacity: 1 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     >
+      {/* Barra de progreso de lectura */}
+      <motion.div
+        className="absolute bottom-0 left-0 right-0 h-[2px] origin-left"
+        style={{
+          scaleX: progressX,
+          background: 'linear-gradient(90deg, #6366F1, #A78BFA)',
+        }}
+        aria-hidden="true"
+      />
       <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <a
           href="#"

@@ -1,11 +1,14 @@
 import { useRef } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, TrendingUp, Cpu, Users } from 'lucide-react'
+import WordReveal from './fx/WordReveal'
+import Counter from './fx/Counter'
+import Magnetic from './fx/Magnetic'
 
 const stats = [
-  { icon: TrendingUp, value: '$4.8M', unit: 'CLP/mes', label: 'promedio en nuevas oportunidades' },
-  { icon: Cpu,        value: '85%',   unit: 'ahorro',  label: 'reducción de tareas manuales' },
-  { icon: Users,      value: '+240',  unit: 'leads',   label: 'cualificados por mes' },
+  { icon: TrendingUp, value: 4.8, prefix: '$', suffix: 'M', decimals: 1, unit: 'CLP/mes', label: 'promedio en nuevas oportunidades' },
+  { icon: Cpu,        value: 85,  suffix: '%',              unit: 'ahorro',  label: 'reducción de tareas manuales' },
+  { icon: Users,      value: 240, prefix: '+',              unit: 'leads',   label: 'cualificados por mes' },
 ]
 
 export default function Hero() {
@@ -91,26 +94,19 @@ export default function Hero() {
           Tu partner de Growth · Paid Media · Contenido · Automatización · Chile
         </motion.div>
 
-        {/* Headline */}
-        <motion.h1
-          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.08] mb-6 drop-shadow-xl"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-        >
-          Hacemos crecer tu negocio{' '}
+        {/* Headline — reveal palabra por palabra */}
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold leading-[1.08] mb-6 drop-shadow-xl">
+          <WordReveal text="Hacemos crecer tu negocio" delay={0.1} />{' '}
           <br className="hidden sm:block" />
-          <span
+          <WordReveal
+            text="del primer clic"
+            delay={0.32}
             className="text-transparent bg-clip-text"
-            style={{
-              backgroundImage: 'linear-gradient(135deg, #818CF8 0%, #A78BFA 50%, #6366F1 100%)',
-            }}
-          >
-            del primer clic
-          </span>
+            style={{ backgroundImage: 'linear-gradient(135deg, #818CF8 0%, #A78BFA 50%, #6366F1 100%)' }}
+          />{' '}
           <br className="hidden sm:block" />
-          al cierre de ventas
-        </motion.h1>
+          <WordReveal text="al cierre de ventas" delay={0.48} />
+        </h1>
 
         {/* Subheadline */}
         <motion.p
@@ -130,19 +126,23 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          <a
-            href="#contacto"
-            className="group flex items-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-all duration-200 cursor-pointer shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
-          >
-            Agenda tu sesión estratégica gratuita
-            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform duration-200" />
-          </a>
-          <a
-            href="#embudo"
-            className="flex items-center gap-2 px-6 py-3.5 border border-white/20 hover:border-white/40 text-white/80 hover:text-white rounded-xl transition-all duration-200 cursor-pointer hover:bg-white/8 backdrop-blur-sm"
-          >
-            Ver cómo funciona
-          </a>
+          <Magnetic>
+            <a
+              href="#contacto"
+              className="group flex items-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-colors duration-200 cursor-pointer shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40"
+            >
+              Agenda tu sesión estratégica gratuita
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform duration-200" />
+            </a>
+          </Magnetic>
+          <Magnetic strength={0.2}>
+            <a
+              href="#servicios"
+              className="flex items-center gap-2 px-6 py-3.5 border border-white/20 hover:border-white/40 text-white/80 hover:text-white rounded-xl transition-colors duration-200 cursor-pointer hover:bg-white/8 backdrop-blur-sm"
+            >
+              Ver cómo funciona
+            </a>
+          </Magnetic>
         </motion.div>
 
         {/* Stats en CLP */}
@@ -152,7 +152,7 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
-          {stats.map(({ icon: Icon, value, unit, label }, i) => (
+          {stats.map(({ icon: Icon, value, prefix, suffix, decimals, unit, label }, i) => (
             <motion.div
               key={label}
               className="flex flex-col items-center gap-1 p-4 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-md"
@@ -162,7 +162,13 @@ export default function Hero() {
             >
               <Icon size={17} className="text-indigo-400 mb-0.5" />
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-semibold text-white leading-none">{value}</span>
+                <Counter
+                  value={value}
+                  prefix={prefix}
+                  suffix={suffix}
+                  decimals={decimals}
+                  className="text-2xl font-semibold text-white leading-none"
+                />
                 <span className="text-xs font-medium text-indigo-300">{unit}</span>
               </div>
               <span className="text-xs text-white/50 text-center leading-tight">{label}</span>
