@@ -14,6 +14,7 @@ const flows = [
     color: '#6366F1',
     description:
       'Un anuncio capta, la IA califica y el CRM da seguimiento — todo solo, 24/7.',
+    metric: { value: '$890K CLP', label: 'costo por cliente adquirido' },
     nodes: [
       { icon: Megaphone, title: 'Anuncio', sub: 'Meta / Google' },
       { icon: MousePointerClick, title: 'Landing', sub: 'Captura el lead' },
@@ -30,6 +31,7 @@ const flows = [
     color: '#EC4899',
     description:
       'Sin automatización: estrategia, producción y edición hechas a mano, mes a mes.',
+    metric: { value: '12+ piezas/mes', label: 'feed constante y profesional' },
     nodes: [
       { icon: Sparkles, title: 'Estrategia', sub: 'Línea editorial' },
       { icon: CalendarDays, title: 'Grilla', sub: 'Plan mensual' },
@@ -46,6 +48,7 @@ const flows = [
     color: '#22C55E',
     description:
       'Solo administramos tu inversión publicitaria: setup, optimización y reportes.',
+    metric: { value: 'ROAS claro', label: 'reporte semanal de resultados' },
     nodes: [
       { icon: Search, title: 'Research', sub: 'Audiencias' },
       { icon: Filter, title: 'Setup', sub: 'Estructura' },
@@ -195,7 +198,7 @@ export default function WorkflowSection() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              {/* Badge + description */}
+              {/* Badge + description + métrica de resultado */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-8 md:mb-10">
                 <span
                   className="self-center sm:self-auto px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap"
@@ -203,7 +206,14 @@ export default function WorkflowSection() {
                 >
                   {flow.badge}
                 </span>
-                <p className="text-sm text-[#8A8F98] text-center sm:text-left">{flow.description}</p>
+                <p className="text-sm text-[#8A8F98] text-center sm:text-left flex-1">{flow.description}</p>
+                <div
+                  className="self-center sm:self-auto flex items-baseline gap-2 px-3 py-1.5 rounded-xl border whitespace-nowrap"
+                  style={{ borderColor: `${flow.color}25`, background: `${flow.color}0A` }}
+                >
+                  <span className="text-sm font-bold" style={{ color: flow.color }}>{flow.metric.value}</span>
+                  <span className="text-xs text-[#8A8F98]">{flow.metric.label}</span>
+                </div>
               </div>
 
               {/* Nodes + connectors */}

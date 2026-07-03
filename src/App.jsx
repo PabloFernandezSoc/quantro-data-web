@@ -2,7 +2,6 @@ import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import ServicesTicker from './components/ServicesTicker'
 import ServicesSection from './components/ServicesSection'
-import FunnelSection from './components/FunnelSection'
 import WorkflowSection from './components/WorkflowSection'
 import TechStack from './components/TechStack'
 import ProcessSection from './components/ProcessSection'
@@ -23,7 +22,6 @@ export default function App() {
         <Hero />
         <ServicesTicker />
         <ServicesSection />
-        <FunnelSection />
         <WorkflowSection />
         <TechStack />
         <ProcessSection />

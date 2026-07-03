@@ -4,6 +4,7 @@ import { ArrowRight, TrendingUp, Cpu, Users } from 'lucide-react'
 import WordReveal from './fx/WordReveal'
 import Counter from './fx/Counter'
 import Magnetic from './fx/Magnetic'
+import NeuralCanvas from './fx/NeuralCanvas'
 
 const stats = [
   { icon: TrendingUp, value: 4.8, prefix: '$', suffix: 'M', decimals: 1, unit: 'CLP/mes', label: 'promedio en nuevas oportunidades' },
@@ -13,10 +14,10 @@ const stats = [
 
 export default function Hero() {
   const ref = useRef(null)
-  const videoRef = useRef(null)
 
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
-  const videoScale  = useTransform(scrollYProgress, [0, 1], [1, 1.08])
+  const bgScale     = useTransform(scrollYProgress, [0, 1], [1, 1.12])
+  const bgOpacity   = useTransform(scrollYProgress, [0, 0.9], [1, 0.35])
   const contentY    = useTransform(scrollYProgress, [0, 1], [0, 100])
   const contentOpac = useTransform(scrollYProgress, [0, 0.6], [1, 0])
 
@@ -26,27 +27,13 @@ export default function Hero() {
       className="relative min-h-dvh flex flex-col items-center justify-center overflow-hidden pt-16"
       aria-label="Hero section"
     >
-      {/* ── Video background ────────────────────────────────── */}
+      {/* ── Fondo generativo: red neuronal reactiva ─────────── */}
       <motion.div
         className="absolute inset-0 z-0"
-        style={{ scale: videoScale }}
+        style={{ scale: bgScale, opacity: bgOpacity }}
       >
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          src="/Video.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          aria-hidden="true"
-        />
+        <NeuralCanvas />
       </motion.div>
-
-      {/* ── Overlay layers ──────────────────────────────────── */}
-      {/* Dark base so text is always readable */}
-      <div className="absolute inset-0 z-10 bg-black/60" aria-hidden="true" />
       {/* Gradient vignette for cinematic depth */}
       <div
         className="absolute inset-0 z-10 pointer-events-none"
