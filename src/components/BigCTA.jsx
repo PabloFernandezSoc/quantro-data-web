@@ -32,11 +32,11 @@ export default function BigCTA() {
 
   return (
     <section ref={ref} className="relative py-28 md:py-44 overflow-hidden" aria-labelledby="bigcta-title">
-      {/* Video de fondo "Trabajamos juntos" */}
+      {/* Video de fondo: el flujo morado */}
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
-        src="/videos/juntos.mp4"
+        src="/videos/flujo.mp4"
         muted
         loop
         playsInline
