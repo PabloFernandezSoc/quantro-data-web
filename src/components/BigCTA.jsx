@@ -1,22 +1,59 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowUpRight } from 'lucide-react'
 import WordReveal from './fx/WordReveal'
 import Magnetic from './fx/Magnetic'
-import NeuralCanvas from './fx/NeuralCanvas'
 
-// Mega-CTA estilo agencia: tipografía gigante + botón magnético.
+// Mega-CTA estilo agencia: video de fondo + tipografía gigante + botón magnético.
 export default function BigCTA() {
   const ref = useRef(null)
+  const videoRef = useRef(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   const glowScale = useTransform(scrollYProgress, [0, 0.5], [0.7, 1.15])
 
+  // El video solo se reproduce cuando la sección está en pantalla
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          if (v.preload === 'none') v.preload = 'auto'
+          v.play().catch(() => {})
+        } else {
+          v.pause()
+        }
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(v)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <section ref={ref} className="relative py-28 md:py-44 overflow-hidden" aria-labelledby="bigcta-title">
-      {/* Red neuronal de fondo (heredada del hero original) */}
-      <div className="absolute inset-0 opacity-60" aria-hidden="true">
-        <NeuralCanvas />
-      </div>
+      {/* Video de fondo "Trabajamos juntos" */}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/videos/juntos.mp4"
+        muted
+        loop
+        playsInline
+        preload="none"
+        aria-hidden="true"
+      />
+      {/* Oscurecido + viñeta para que el texto mande */}
+      <div className="absolute inset-0 bg-black/65" aria-hidden="true" />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 90% 70% at 50% 0%, rgba(2,2,3,0.9) 0%, transparent 60%), ' +
+            'radial-gradient(ellipse 90% 70% at 50% 100%, rgba(2,2,3,0.9) 0%, transparent 60%)',
+        }}
+        aria-hidden="true"
+      />
 
       {/* Glow que crece con el scroll */}
       <motion.div

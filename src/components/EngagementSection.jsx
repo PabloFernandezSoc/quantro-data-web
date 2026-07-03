@@ -62,6 +62,12 @@ function ModelCard({ model, index }) {
       initial={{ opacity: 0, y: 36, rotate: index === 0 ? -3 : index === 2 ? 3 : 0, scale: 0.95 }}
       animate={isInView ? { opacity: 1, y: 0, rotate: 0, scale: 1 } : {}}
       transition={{ duration: 0.65, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{
+        y: -6,
+        boxShadow: '0 0 55px rgba(99,102,241,0.22)',
+        borderColor: 'rgba(99,102,241,0.45)',
+        transition: { duration: 0.25 },
+      }}
     >
       {model.featured && (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500 text-white whitespace-nowrap shadow-lg shadow-indigo-500/30">

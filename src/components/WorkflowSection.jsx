@@ -15,7 +15,6 @@ const flows = [
     color: '#6366F1',
     description:
       'Un anuncio capta, la IA califica y el CRM da seguimiento — todo solo, 24/7.',
-    metric: { value: '$890K CLP', label: 'costo por cliente adquirido' },
     nodes: [
       { icon: Megaphone, title: 'Anuncio', sub: 'Meta / Google' },
       { icon: MousePointerClick, title: 'Landing', sub: 'Captura el lead' },
@@ -211,13 +210,15 @@ export default function WorkflowSection() {
                   {flow.badge}
                 </span>
                 <p className="text-sm text-[#8A8F98] text-center sm:text-left flex-1">{flow.description}</p>
-                <div
-                  className="self-center sm:self-auto flex items-baseline gap-2 px-3 py-1.5 rounded-xl border whitespace-nowrap"
-                  style={{ borderColor: `${flow.color}25`, background: `${flow.color}0A` }}
-                >
-                  <span className="text-sm font-bold" style={{ color: flow.color }}>{flow.metric.value}</span>
-                  <span className="text-xs text-[#8A8F98]">{flow.metric.label}</span>
-                </div>
+                {flow.metric && (
+                  <div
+                    className="self-center sm:self-auto flex items-baseline gap-2 px-3 py-1.5 rounded-xl border whitespace-nowrap"
+                    style={{ borderColor: `${flow.color}25`, background: `${flow.color}0A` }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: flow.color }}>{flow.metric.value}</span>
+                    <span className="text-xs text-[#8A8F98]">{flow.metric.label}</span>
+                  </div>
+                )}
               </div>
 
               {/* Nodes + connectors */}

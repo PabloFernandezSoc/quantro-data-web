@@ -1,37 +1,30 @@
 import { useRef } from 'react'
 import { motion, useInView } from 'motion/react'
-import { Search, Settings, BarChart3, Rocket } from 'lucide-react'
+import { Search, Settings, Rocket } from 'lucide-react'
 import WordReveal from './fx/WordReveal'
 import GhostTitle from './fx/GhostTitle'
 
 const steps = [
   {
     icon: Search,
-    week: 'Semana 1',
-    title: 'Diagnóstico estratégico',
+    week: 'Paso 01',
+    title: 'Partimos conversando',
     description:
-      'Auditamos tu embudo actual, identificamos los puntos de fuga y mapeamos las oportunidades de automatización con mayor impacto en tu negocio.',
+      'Todo empieza con una reunión para conocer tu negocio y evaluar el proyecto. Sin tecnicismos ni compromiso — queremos entender qué necesitas de verdad.',
   },
   {
     icon: Settings,
-    week: 'Semanas 2–3',
-    title: 'Arquitectura & construcción',
+    week: 'Paso 02',
+    title: 'Pensamos fuera de la caja',
     description:
-      'Diseñamos y construimos los flujos de automatización, configuramos las integraciones entre plataformas y programamos los agentes de IA.',
-  },
-  {
-    icon: BarChart3,
-    week: 'Semana 4',
-    title: 'Activación & monitoreo',
-    description:
-      'Lanzamos el sistema, conectamos el tracking, calibramos los modelos con datos reales y entregamos dashboards de control en tiempo real.',
+      'Nos metemos en tu contexto: tu competencia, tus datos, tu audiencia. Analizamos el problema desde ángulos que no son obvios y te proponemos un plan concreto.',
   },
   {
     icon: Rocket,
-    week: 'Mes 2+',
-    title: 'Optimización continua',
+    week: 'Paso 03',
+    title: 'Ejecutamos e iteramos',
     description:
-      'Iteramos sobre los resultados cada sprint, escalamos lo que funciona y refinamos lo que no. Tu sistema mejora semana a semana.',
+      'Lanzamos, medimos y mejoramos. Cada semana sabes qué funcionó, qué cambiamos y qué viene — tu crecimiento se vuelve un proceso, no una apuesta.',
   },
 ]
 
@@ -99,31 +92,24 @@ export default function ProcessSection() {
             Proceso
           </span>
           <h2 id="proceso-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
-            <WordReveal text="De cero a sistema" />{' '}
+            <WordReveal text="Trabajar con nosotros" />{' '}
             <WordReveal
-              text="en 30 días"
+              text="es así de simple"
               delay={0.16}
-              className="text-transparent bg-clip-text"
+              className="serif-italic text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
             />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg max-w-xl mx-auto">
-            Un proceso claro, sin sorpresas, con entregas concretas en cada etapa.
+            Sin procesos eternos ni jerga técnica: tres pasos y estás creciendo.
           </p>
         </motion.div>
 
-        {/* Steps: single column on mobile, 2 cols on desktop */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16">
-          <div>
-            {steps.slice(0, 2).map((step, i) => (
-              <ProcessStep key={step.title} step={step} index={i} isLast={false} />
-            ))}
-          </div>
-          <div className="md:pt-10">
-            {steps.slice(2).map((step, i) => (
-              <ProcessStep key={step.title} step={step} index={i + 2} isLast={i === 1} />
-            ))}
-          </div>
+        {/* Timeline vertical única — 3 pasos */}
+        <div className="max-w-2xl mx-auto">
+          {steps.map((step, i) => (
+            <ProcessStep key={step.title} step={step} index={i} isLast={i === steps.length - 1} />
+          ))}
         </div>
 
         {/* Bottom CTA */}
@@ -139,10 +125,10 @@ export default function ProcessSection() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-white font-medium text-base md:text-lg mb-2">
-            ¿Listo para automatizar tu crecimiento?
+            ¿Damos el primer paso?
           </p>
           <p className="text-[#8A8F98] text-sm mb-5">
-            La primera sesión es gratuita. Sin compromiso, con valor real.
+            La primera reunión es gratuita. Sin compromiso, con valor real.
           </p>
           <a
             href="#contacto"
