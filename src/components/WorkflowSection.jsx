@@ -5,6 +5,7 @@ import {
   Sparkles, CalendarDays, Video, Scissors, Share2, LineChart,
   Search, Filter, PenTool, Gauge, BarChart3,
 } from 'lucide-react'
+import WordReveal from './fx/WordReveal'
 
 const flows = [
   {
@@ -139,12 +140,15 @@ export default function WorkflowSection() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-violet-500/20 bg-violet-500/8 text-violet-300 mb-4 uppercase tracking-widest">
             Workflows en acción
           </span>
-          <h2 id="workflows-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            Mira{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #A78BFA, #818CF8)' }}>
-              cómo trabaja
-            </span>{' '}
-            cada engranaje
+          <h2 id="workflows-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="Mira" />{' '}
+            <WordReveal
+              text="cómo trabaja"
+              delay={0.1}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #A78BFA, #818CF8)' }}
+            />{' '}
+            <WordReveal text="cada engranaje" delay={0.22} />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg leading-relaxed">
             Cada proyecto es un flujo claro y medible. Elige un objetivo y observa el playbook

@@ -1,6 +1,8 @@
 import { useRef } from 'react'
-import { motion, useInView, useScroll, useTransform } from 'motion/react'
+import { motion, useInView } from 'motion/react'
 import { Search, Settings, BarChart3, Rocket } from 'lucide-react'
+import WordReveal from './fx/WordReveal'
+import GhostTitle from './fx/GhostTitle'
 
 const steps = [
   {
@@ -46,13 +48,23 @@ function ProcessStep({ step, index, isLast }) {
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.6, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* Timeline icon + line */}
+      {/* Timeline: icono con pop + línea que se dibuja al entrar en vista */}
       <div className="flex flex-col items-center flex-shrink-0">
-        <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
+        <motion.div
+          className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center"
+          initial={{ scale: 0, rotate: -30 }}
+          animate={isInView ? { scale: 1, rotate: 0 } : {}}
+          transition={{ type: 'spring', stiffness: 260, damping: 18, delay: index * 0.1 + 0.1 }}
+        >
           <Icon size={18} className="text-indigo-400" />
-        </div>
+        </motion.div>
         {!isLast && (
-          <div className="w-px flex-1 mt-3 bg-gradient-to-b from-indigo-500/20 to-transparent min-h-[40px]" />
+          <motion.div
+            className="w-px flex-1 mt-3 bg-gradient-to-b from-indigo-500/40 to-indigo-500/5 min-h-[40px] origin-top"
+            initial={{ scaleY: 0 }}
+            animate={isInView ? { scaleY: 1 } : {}}
+            transition={{ duration: 0.8, delay: index * 0.1 + 0.35, ease: [0.16, 1, 0.3, 1] }}
+          />
         )}
       </div>
 
@@ -70,27 +82,11 @@ export default function ProcessSection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
 
-  const containerRef = useRef(null)
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start end', 'end start'] })
-  const x = useTransform(scrollYProgress, [0, 1], [40, -40])
-
   return (
     <section id="proceso" className="py-20 md:py-32 relative overflow-hidden" aria-labelledby="proceso-title">
-      {/* Floating background text */}
-      <motion.div
-        ref={containerRef}
-        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
-        aria-hidden="true"
-      >
-        <motion.span
-          className="text-[20vw] font-bold text-white/[0.015] whitespace-nowrap"
-          style={{ x }}
-        >
-          PROCESO
-        </motion.span>
-      </motion.div>
+      <GhostTitle text="PROCESO" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 relative">
         {/* Header */}
         <motion.div
           ref={ref}
@@ -102,11 +98,14 @@ export default function ProcessSection() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-indigo-500/20 bg-indigo-500/8 text-indigo-300 mb-4 uppercase tracking-widest">
             Proceso
           </span>
-          <h2 id="proceso-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            De cero a sistema{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}>
-              en 30 días
-            </span>
+          <h2 id="proceso-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="De cero a sistema" />{' '}
+            <WordReveal
+              text="en 30 días"
+              delay={0.16}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
+            />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg max-w-xl mx-auto">
             Un proceso claro, sin sorpresas, con entregas concretas en cada etapa.

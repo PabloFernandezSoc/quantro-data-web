@@ -1,5 +1,7 @@
 import { useRef } from 'react'
 import { motion, useInView } from 'motion/react'
+import WordReveal from './fx/WordReveal'
+import GhostTitle from './fx/GhostTitle'
 
 const tools = [
   {
@@ -144,9 +146,9 @@ function ToolCard({ tool, index }) {
         borderColor: 'rgba(255,255,255,0.07)',
         minHeight: 140,
       }}
-      initial={{ opacity: 0, y: 20, scale: 0.97 }}
-      animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-      transition={{ duration: 0.5, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, y: 30, scale: 0.94, rotate: index % 2 ? 1.5 : -1.5 }}
+      animate={isInView ? { opacity: 1, y: 0, scale: 1, rotate: 0 } : {}}
+      transition={{ duration: 0.6, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
     >
       {/* Hover glow */}
@@ -184,8 +186,9 @@ export default function TechStack() {
   const isInView = useInView(ref, { once: true, margin: '-100px' })
 
   return (
-    <section id="stack" className="py-20 md:py-32 relative" aria-labelledby="stack-title">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+    <section id="stack" className="py-20 md:py-32 relative overflow-hidden" aria-labelledby="stack-title">
+      <GhostTitle text="STACK" direction={-1} />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 relative">
         <motion.div
           ref={ref}
           className="text-center mb-12 md:mb-16"
@@ -196,11 +199,14 @@ export default function TechStack() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-violet-500/20 bg-violet-500/8 text-violet-300 mb-4 uppercase tracking-widest">
             Tech Stack
           </span>
-          <h2 id="stack-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            Las mejores herramientas,{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #A78BFA, #818CF8)' }}>
-              en las manos correctas
-            </span>
+          <h2 id="stack-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="Las mejores herramientas," />{' '}
+            <WordReveal
+              text="en las manos correctas"
+              delay={0.18}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #A78BFA, #818CF8)' }}
+            />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg max-w-xl mx-auto">
             Dominamos el ecosistema completo de automatización y growth para construir sistemas

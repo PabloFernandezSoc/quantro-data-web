@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { motion, useInView, AnimatePresence } from 'motion/react'
 import { Plus } from 'lucide-react'
+import WordReveal from './fx/WordReveal'
 
 // Las mismas preguntas alimentan el JSON-LD (FAQPage) en index.html.
 export const faqs = [
@@ -113,11 +114,14 @@ export default function FAQSection() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-indigo-500/20 bg-indigo-500/8 text-indigo-300 mb-4 uppercase tracking-widest">
             Preguntas frecuentes
           </span>
-          <h2 id="faq-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            Todo lo que necesitas saber{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}>
-              antes de empezar
-            </span>
+          <h2 id="faq-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="Todo lo que necesitas saber" />{' '}
+            <WordReveal
+              text="antes de empezar"
+              delay={0.2}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
+            />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg">
             ¿Te queda otra duda? Escríbenos y te respondemos en menos de 24 horas.

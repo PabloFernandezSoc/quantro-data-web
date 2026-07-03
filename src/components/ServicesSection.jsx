@@ -1,6 +1,8 @@
 import { useRef } from 'react'
-import { motion, useInView } from 'motion/react'
+import { motion, useInView, useMotionValue, useSpring } from 'motion/react'
 import { Megaphone, Clapperboard, Bot, Database, LineChart, Target, ArrowRight } from 'lucide-react'
+import WordReveal from './fx/WordReveal'
+import GhostTitle from './fx/GhostTitle'
 
 const services = [
   {
@@ -64,22 +66,44 @@ function ServiceCard({ service, index }) {
   const isInView = useInView(ref, { once: true, margin: '-60px' })
   const Icon = service.icon
 
-  // Spotlight: el glow sigue la posición del cursor dentro de la tarjeta
+  // Tilt 3D con física de resorte
+  const rx = useMotionValue(0)
+  const ry = useMotionValue(0)
+  const srx = useSpring(rx, { stiffness: 180, damping: 18 })
+  const sry = useSpring(ry, { stiffness: 180, damping: 18 })
+
+  // Spotlight (glow que sigue al cursor) + inclinación 3D
   function onMove(e) {
     const rect = e.currentTarget.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / rect.width
+    const py = (e.clientY - rect.top) / rect.height
     e.currentTarget.style.setProperty('--mx', `${e.clientX - rect.left}px`)
     e.currentTarget.style.setProperty('--my', `${e.clientY - rect.top}px`)
+    ry.set((px - 0.5) * 9)
+    rx.set(-(py - 0.5) * 7)
+  }
+
+  function onLeave() {
+    rx.set(0)
+    ry.set(0)
   }
 
   return (
     <motion.div
       ref={ref}
       className="group relative rounded-2xl border overflow-hidden p-6 md:p-7"
-      style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'rgba(255,255,255,0.07)' }}
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        borderColor: 'rgba(255,255,255,0.07)',
+        rotateX: srx,
+        rotateY: sry,
+        transformPerspective: 900,
+      }}
       onMouseMove={onMove}
-      initial={{ opacity: 0, y: 24 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay: index * 0.07, ease: [0.16, 1, 0.3, 1] }}
+      onMouseLeave={onLeave}
+      initial={{ opacity: 0, y: 28, scale: 0.96 }}
+      animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
+      transition={{ duration: 0.6, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
     >
       {/* Spotlight que sigue al cursor */}
@@ -136,7 +160,8 @@ export default function ServicesSection() {
 
   return (
     <section id="servicios" className="py-20 md:py-32 relative overflow-hidden" aria-labelledby="servicios-title">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <GhostTitle text="GROWTH" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 relative">
         {/* Header */}
         <motion.div
           ref={ref}
@@ -148,11 +173,14 @@ export default function ServicesSection() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-indigo-500/20 bg-indigo-500/8 text-indigo-300 mb-4 uppercase tracking-widest">
             Servicios
           </span>
-          <h2 id="servicios-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            No solo automatización.{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}>
-              Growth de punta a punta
-            </span>
+          <h2 id="servicios-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="No solo automatización." />{' '}
+            <WordReveal
+              text="Growth de punta a punta"
+              delay={0.18}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
+            />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg leading-relaxed">
             Desde traer a los clientes correctos hasta producir el contenido que los enamora.

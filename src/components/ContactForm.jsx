@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { motion, useInView, AnimatePresence } from 'motion/react'
 import { CheckCircle2, Send, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import WordReveal from './fx/WordReveal'
 
 const services = [
   'Automatización de marketing',
@@ -102,11 +103,14 @@ export default function ContactForm() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-green-500/20 bg-green-500/8 text-green-300 mb-4 uppercase tracking-widest">
             Sesión estratégica gratuita
           </span>
-          <h2 id="contacto-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            Hablemos de tu{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}>
-              próximo nivel
-            </span>
+          <h2 id="contacto-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="Hablemos de tu" />{' '}
+            <WordReveal
+              text="próximo nivel"
+              delay={0.14}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
+            />
           </h2>
           <p className="text-[#8A8F98] text-lg max-w-md mx-auto">
             Cuéntanos sobre tu negocio y te mostraremos en 45 minutos exactamente qué automatizar

@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { motion, useInView } from 'motion/react'
 import { Target, Repeat, Workflow, Check } from 'lucide-react'
+import WordReveal from './fx/WordReveal'
 
 const models = [
   {
@@ -58,9 +59,9 @@ function ModelCard({ model, index }) {
         borderColor: model.featured ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)',
         boxShadow: model.featured ? '0 0 50px rgba(99,102,241,0.12)' : 'none',
       }}
-      initial={{ opacity: 0, y: 24 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, y: 36, rotate: index === 0 ? -3 : index === 2 ? 3 : 0, scale: 0.95 }}
+      animate={isInView ? { opacity: 1, y: 0, rotate: 0, scale: 1 } : {}}
+      transition={{ duration: 0.65, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
     >
       {model.featured && (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500 text-white whitespace-nowrap shadow-lg shadow-indigo-500/30">
@@ -121,12 +122,15 @@ export default function EngagementSection() {
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium border border-indigo-500/20 bg-indigo-500/8 text-indigo-300 mb-4 uppercase tracking-widest">
             Cómo trabajamos
           </span>
-          <h2 id="modelos-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white tracking-tight mb-4">
-            Un alcance para{' '}
-            <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}>
-              cada etapa
-            </span>{' '}
-            de tu negocio
+          <h2 id="modelos-title" className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-4">
+            <WordReveal text="Un alcance para" />{' '}
+            <WordReveal
+              text="cada etapa"
+              delay={0.14}
+              className="text-transparent bg-clip-text"
+              style={{ backgroundImage: 'linear-gradient(135deg, #818CF8, #A78BFA)' }}
+            />{' '}
+            <WordReveal text="de tu negocio" delay={0.24} />
           </h2>
           <p className="text-[#8A8F98] text-base md:text-lg leading-relaxed">
             No te amarramos a un paquete gigante. Empieza por donde más lo necesitas
