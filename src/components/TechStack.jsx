@@ -9,24 +9,40 @@ const icons = {
   meta: (
     <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
       <rect width="100" height="100" rx="24" fill="#0866FF"/>
-      <path d="M50 22C34.536 22 22 34.536 22 50C22 63.978 32.176 75.555 45.5 77.666V58.5H38V50H45.5V43.5C45.5 36.094 49.888 32 56.614 32C59.832 32 63.2 32.562 63.2 32.562V39.875H59.488C55.84 39.875 54.75 42.05 54.75 44.281V50H62.875L61.629 58.5H54.75V77.666C68.074 75.555 78.25 63.978 78.25 50C78.25 34.536 65.464 22 50 22Z" fill="white"/>
+      <path
+        d="M28 50 C28 40 36 36 43 43 L57 57 C64 64 72 60 72 50 C72 40 64 36 57 43 L43 57 C36 64 28 60 28 50 Z"
+        stroke="white"
+        strokeWidth="8"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   ),
   google: (
     <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
       <rect width="100" height="100" rx="24" fill="#1a1a2e"/>
-      <circle cx="38" cy="50" r="14" fill="none" stroke="#4285F4" strokeWidth="6"/>
-      <circle cx="62" cy="50" r="14" fill="none" stroke="#EA4335" strokeWidth="6"/>
-      <circle cx="50" cy="38" r="14" fill="none" stroke="#FBBC04" strokeWidth="6"/>
-      <circle cx="50" cy="62" r="14" fill="none" stroke="#34A853" strokeWidth="6"/>
+      <line x1="34" y1="64" x2="51" y2="33" stroke="#FBBC04" strokeWidth="17" strokeLinecap="round"/>
+      <line x1="49" y1="33" x2="66" y2="64" stroke="#4285F4" strokeWidth="17" strokeLinecap="round"/>
+      <circle cx="34" cy="64" r="9.5" fill="#34A853"/>
     </svg>
   ),
   tiktok: (
     <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
       <rect width="100" height="100" rx="24" fill="#0a0a0c"/>
-      <path d="M62 24c1.4 6.8 6 12 13 13.4V47c-5 0-9.6-1.6-13-4.2V62c0 10-8 18-18 18s-18-8-18-18 8-18 18-18c1 0 2 .1 3 .3v10.3c-1-.4-2-.6-3-.6-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8V24h10z" fill="#25F4EE"/>
-      <path d="M65 27c1.4 6.8 6 12 13 13.4V50c-5 0-9.6-1.6-13-4.2V65c0 10-8 18-18 18-3.2 0-6.2-.8-8.8-2.3C41.5 83.1 44.6 84 48 84c10 0 18-8 18-18V44.8c3.4 2.6 8 4.2 13 4.2V38.4C72 37 67.4 31.8 66 25h-1v2z" fill="#FE2C55" opacity="0.85"/>
-      <path d="M62 24v38c0 4.4-3.6 8-8 8s-8-3.6-8-8 3.6-8 8-8c1 0 2 .2 3 .6V44.3c-1-.2-2-.3-3-.3-10 0-18 8-18 18s8 18 18 18 18-8 18-18V42.8c3.4 2.6 8 4.2 13 4.2v-9.6C78 36 73.4 30.8 72 24H62z" fill="white"/>
+      <g fill="none" strokeWidth="9" strokeLinecap="round">
+        <g transform="translate(-2.5 -2)" stroke="#25F4EE">
+          <path d="M54 28v31a12 12 0 1 1-10-11.8"/>
+          <path d="M54 30c2.5 8 8.5 13 16 13.5"/>
+        </g>
+        <g transform="translate(2.5 2)" stroke="#FE2C55">
+          <path d="M54 28v31a12 12 0 1 1-10-11.8"/>
+          <path d="M54 30c2.5 8 8.5 13 16 13.5"/>
+        </g>
+        <g stroke="white">
+          <path d="M54 28v31a12 12 0 1 1-10-11.8"/>
+          <path d="M54 30c2.5 8 8.5 13 16 13.5"/>
+        </g>
+      </g>
     </svg>
   ),
   whatsapp: (
@@ -59,26 +75,69 @@ const icons = {
   ),
   claude: (
     <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
-      <rect width="100" height="100" rx="24" fill="#D97706"/>
-      <path d="M50 20 C35 20 25 32 25 50 C25 62 33 72 44 76 L50 80 L56 76 C67 72 75 62 75 50 C75 32 65 20 50 20Z" fill="white" opacity="0.9"/>
-      <path d="M42 48 L50 56 L58 44" stroke="#D97706" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect width="100" height="100" rx="24" fill="#D97757"/>
+      <g stroke="white" strokeWidth="6.5" strokeLinecap="round">
+        {Array.from({ length: 12 }).map((_, i) => {
+          const a = (i * Math.PI) / 6
+          const r2 = i % 2 ? 24 : 29
+          return (
+            <line
+              key={i}
+              x1={50 + Math.cos(a) * 11}
+              y1={50 + Math.sin(a) * 11}
+              x2={50 + Math.cos(a) * r2}
+              y2={50 + Math.sin(a) * r2}
+            />
+          )
+        })}
+      </g>
     </svg>
   ),
   analytics: (
     <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
-      <rect width="100" height="100" rx="24" fill="#6366F1"/>
-      <rect x="22" y="62" width="14" height="20" rx="3" fill="white" opacity="0.6"/>
-      <rect x="43" y="44" width="14" height="38" rx="3" fill="white" opacity="0.8"/>
-      <rect x="64" y="28" width="14" height="54" rx="3" fill="white"/>
-      <path d="M28 55 L50 42 L71 30" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3"/>
+      <rect width="100" height="100" rx="24" fill="#1a1a2e"/>
+      <rect x="60" y="24" width="17" height="52" rx="8.5" fill="#F9AB00"/>
+      <rect x="41" y="43" width="17" height="33" rx="8.5" fill="#F9AB00" opacity="0.8"/>
+      <circle cx="31" cy="67" r="9" fill="#E37400"/>
     </svg>
   ),
   looker: (
     <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
       <rect width="100" height="100" rx="24" fill="#1a1a2e"/>
-      <circle cx="50" cy="54" r="20" fill="none" stroke="#4285F4" strokeWidth="7"/>
-      <circle cx="50" cy="54" r="7" fill="#FBBC04"/>
-      <path d="M62 30 L70 20" stroke="#34A853" strokeWidth="7" strokeLinecap="round"/>
+      <rect x="56" y="26" width="17" height="48" rx="8.5" fill="#4285F4"/>
+      <rect x="26" y="57" width="30" height="17" rx="8.5" fill="#669DF6"/>
+      <circle cx="34" cy="34" r="9" fill="#AECBFA"/>
+    </svg>
+  ),
+  powerbi: (
+    <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
+      <rect width="100" height="100" rx="24" fill="#F2C811"/>
+      <rect x="24" y="48" width="14" height="28" rx="3" fill="#12100B" opacity="0.75"/>
+      <rect x="43" y="36" width="14" height="40" rx="3" fill="#12100B" opacity="0.88"/>
+      <rect x="62" y="24" width="14" height="52" rx="3" fill="#12100B"/>
+    </svg>
+  ),
+  tableau: (
+    <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
+      <rect width="100" height="100" rx="24" fill="#0f1420"/>
+      <g strokeLinecap="round">
+        <path d="M50 36v28M36 50h28" stroke="#5C6692" strokeWidth="8"/>
+        <path d="M50 20v12M44 26h12" stroke="#F28E2B" strokeWidth="5"/>
+        <path d="M50 68v12M44 74h12" stroke="#F28E2B" strokeWidth="5"/>
+        <path d="M24 50h12M30 44v12" stroke="#59A9CF" strokeWidth="5"/>
+        <path d="M64 50h12M70 44v12" stroke="#59A9CF" strokeWidth="5"/>
+      </g>
+    </svg>
+  ),
+  openclaw: (
+    <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none">
+      <rect width="100" height="100" rx="24" fill="#0F766E"/>
+      <g stroke="white" strokeWidth="7" strokeLinecap="round">
+        <path d="M30 72c-4-20 4-36 20-42"/>
+        <path d="M46 74c-2-16 4-28 16-34"/>
+        <path d="M62 74c0-11 5-19 13-24"/>
+      </g>
+      <circle cx="52" cy="28" r="4.5" fill="white"/>
     </svg>
   ),
 }
@@ -103,6 +162,7 @@ const groups = [
       { name: 'n8n', description: 'Workflows visuales', icon: icons.n8n },
       { name: 'Python', description: 'Scripts y pipelines a medida', icon: icons.python },
       { name: 'Claude', description: 'IA para contexto y creatividad', icon: icons.claude },
+      { name: 'OpenClaw', description: 'Agentes IA autónomos', icon: icons.openclaw },
     ],
   },
   {
@@ -111,6 +171,8 @@ const groups = [
     tools: [
       { name: 'Analytics 4', description: 'Tracking y comportamiento', icon: icons.analytics },
       { name: 'Looker Studio', description: 'Dashboards en tiempo real', icon: icons.looker },
+      { name: 'Power BI', description: 'Reportería corporativa', icon: icons.powerbi },
+      { name: 'Tableau', description: 'Visualización avanzada', icon: icons.tableau },
     ],
   },
 ]
