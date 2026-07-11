@@ -26,3 +26,13 @@ create policy "Permitir inserción pública"
 
 -- Para leer los leads desde el dashboard de Supabase usa el service_role key
 -- o crea una política authenticated si quieres un panel de admin propio.
+
+-- ─────────────────────────────────────────────────────────────
+-- Notificaciones de leads (aplicado 2026-07-10 vía MCP)
+-- Al insertarse un lead: push vía ntfy.sh (topic quantro-leads-qd8k3x7m2p)
+-- + email a quantrodata@gmail.com vía FormSubmit.
+-- La función vive en la base como public.notify_new_lead()
+-- (SECURITY DEFINER, sin EXECUTE para anon/authenticated; solo el trigger).
+-- Trigger: trg_notify_new_lead AFTER INSERT ON contact_leads.
+-- Keepalive: Vercel Cron diario → /api/keepalive (evita la pausa por
+-- inactividad del plan gratuito de Supabase).
