@@ -1,15 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <defs>
-    <linearGradient id="qg" x1="8" y1="8" x2="92" y2="92" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#818CF8"/>
-      <stop offset="0.55" stop-color="#6366F1"/>
-      <stop offset="1" stop-color="#8B5CF6"/>
-    </linearGradient>
-  </defs>
-  <rect width="100" height="100" rx="24" fill="url(#qg)"/>
-  <!-- orbital ring (the "Q" / quantum) -->
-  <circle cx="45" cy="55" r="21" fill="none" stroke="#fff" stroke-width="6.5" opacity="0.95"/>
-  <!-- growth arrow breaking up-right -->
-  <path d="M39 61 L60 40" stroke="#fff" stroke-width="6.5" stroke-linecap="round"/>
-  <path d="M49 38 L63 38 L63 52" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none"><defs><linearGradient id="bg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#6366F1"></stop><stop offset="1" stop-color="#8B5CF6"></stop></linearGradient></defs><rect width="100" height="100" rx="24" fill="url(#bg)"></rect><g transform="translate(9,9) scale(0.82)"><path d="M 77.2 37.3 A 30 30 0 0 1 37.3 77.2" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" fill="none"></path><path d="M 22.8 62.7 A 30 30 0 0 1 62.7 22.8" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" fill="none"></path><line x1="72" y1="72" x2="83" y2="83" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"></line><circle cx="50" cy="50" r="13" stroke="#FFFFFF" stroke-width="4.5" fill="none"></circle><circle cx="50" cy="50" r="5" fill="#FFFFFF"></circle></g></svg>
