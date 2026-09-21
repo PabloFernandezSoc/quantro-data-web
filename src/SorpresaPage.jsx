@@ -145,10 +145,10 @@ export default function SorpresaPage() {
               </motion.span>
 
               <h1 className="sorpresa-titulo text-3xl sm:text-5xl md:text-6xl leading-[1.15]">
-                En el día de las flores amarillas
+                Hay una sorpresa disponible para
                 <br />
                 <span className="serif-italic sorpresa-destacado">
-                  tengo una sorpresa para ti
+                  Mir Morcius
                 </span>
               </h1>
 
@@ -190,7 +190,7 @@ export default function SorpresaPage() {
               </motion.div>
 
               <p className="sorpresa-texto-rata mt-6 text-lg sm:text-xl">
-                Ah… ¿así estamos?
+                Piénsalo bien panzona
               </p>
 
               <button
@@ -198,7 +198,7 @@ export default function SorpresaPage() {
                 className="sorpresa-boton sorpresa-boton-si mt-7 inline-flex items-center gap-2"
               >
                 <RotateCcw size={16} />
-                Ya, ya… quiero mi sorpresa
+                Volver a reflexionar
               </button>
             </motion.div>
           )}
@@ -323,10 +323,10 @@ export default function SorpresaPage() {
             >
               <span className="block text-4xl mb-3">💛</span>
               <h2 id="sorpresa-pregunta" className="sorpresa-modal-titulo">
-                ¿Deseas canjear tu sorpresa?
+                ¿Quieres canjear tu sorpresa?
               </h2>
               <p className="sorpresa-modal-texto">
-                Es solo una pregunta de trámite, la respuesta correcta ya la sabes.
+                Ojito con tu respuesta.
               </p>
 
               <div className="flex items-center justify-center gap-3 mt-7">
