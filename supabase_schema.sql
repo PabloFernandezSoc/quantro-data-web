@@ -36,3 +36,7 @@ create policy "Permitir inserción pública"
 -- Trigger: trg_notify_new_lead AFTER INSERT ON contact_leads.
 -- Keepalive: Vercel Cron diario → /api/keepalive (evita la pausa por
 -- inactividad del plan gratuito de Supabase).
+
+-- ─────────────────────────────────────────────────────────────
+-- Quantro Studio (/app): esquema de la app de producción de grillas
+-- en supabase/studio_schema.sql (aplicado 2026-10-21 vía MCP).

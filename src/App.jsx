@@ -13,12 +13,24 @@ import ContactForm from './components/ContactForm'
 import Footer from './components/Footer'
 import VisionPage from './VisionPage'
 import SorpresaPage from './SorpresaPage'
+import { lazy, Suspense } from 'react'
+
+// App interna (Quantro Studio) en chunk aparte: no pesa en la landing
+const StudioApp = lazy(() => import('./studio/StudioApp'))
 
 export default function App() {
   // Router mínimo: /vision es la única ruta secundaria
   // (Vercel reescribe todo a index.html, así que el path llega intacto)
   if (window.location.pathname.startsWith('/vision')) {
     return <VisionPage />
+  }
+
+  if (window.location.pathname === '/app' || window.location.pathname.startsWith('/app/')) {
+    return (
+      <Suspense fallback={<div className="min-h-dvh" style={{ background: 'var(--color-bg-deep)' }} />}>
+        <StudioApp />
+      </Suspense>
+    )
   }
 
   // Ruta oculta: no está en el sitemap ni enlazada desde ningún lado
