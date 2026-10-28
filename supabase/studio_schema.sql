@@ -18,6 +18,7 @@ create table if not exists public.profiles (
   full_name  text not null,
   email      text not null,
   is_admin   boolean not null default false,
+  alias      text,  -- rótulo en los guiones (ej. JT); si es null se usa primer nombre o iniciales
   active     boolean not null default true,
   created_at timestamptz not null default now()
 );

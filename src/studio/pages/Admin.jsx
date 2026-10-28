@@ -56,7 +56,7 @@ function Users() {
               <Avatar person={p} size={32} />
               <div className="min-w-0 flex-1">
                 <p className="font-medium">
-                  {p.full_name} {p.id === userId && <span className="text-xs text-foreground-subtle">(tú)</span>}
+                  {p.full_name} {p.alias && <span className="text-xs text-foreground-muted">· “{p.alias}” en guiones</span>} {p.id === userId && <span className="text-xs text-foreground-subtle">(tú)</span>}
                 </p>
                 <p className="truncate text-xs text-foreground-muted">{p.email}</p>
               </div>
@@ -91,6 +91,7 @@ function Users() {
 function UserForm({ user, memberships, clients, isSelf, onClose, onSaved }) {
   const [form, setForm] = useState({
     full_name: user?.full_name || '',
+    alias: user?.alias || '',
     email: user?.email || '',
     password: user ? '' : generatePassword(),
     is_admin: user?.is_admin || false,
@@ -154,6 +155,9 @@ function UserForm({ user, memberships, clients, isSelf, onClose, onSaved }) {
     <Modal open onClose={onClose} title={user ? `Editar ${user.full_name}` : 'Nuevo usuario'}>
       <form onSubmit={submit} className="space-y-3">
         <Field label="Nombre (el primer nombre se usa al importar rostros)"><Input value={form.full_name} onChange={set('full_name')} required /></Field>
+        <Field label="Alias en los guiones (opcional)" hint="Cómo aparece en los guiones si no es su primer nombre ni sus iniciales. Ej: JT.">
+          <Input value={form.alias} onChange={set('alias')} placeholder="JT" />
+        </Field>
         <Field label="Email (usuario y canal de recordatorios)"><Input type="email" value={form.email} onChange={set('email')} required /></Field>
         <Field label={user ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña inicial'}>
           <div className="flex gap-2">

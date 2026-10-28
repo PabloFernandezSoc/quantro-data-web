@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CircleCheckBig, FolderUp } from 'lucide-react'
+import { CircleCheckBig, FolderUp, BookOpenText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q, rpc } from '../lib/api'
 import { useStudio, openPiece } from '../lib/store'
 import { PRE_MATERIAL } from '../lib/constants'
+import { parseScript, matchSpeaker } from '../lib/script'
 import { deadlines, daysUntil, shortDate, monthLabel } from '../lib/dates'
 import { Card, Button, PageHeader, Empty, Spinner, ErrorNote, DueBadge, PartBadge, StatusBadge, Select, Modal, cx } from '../components/ui'
 import { PartUploadButton, UploadForm } from '../components/Actions'
 
 // "Lo que te falta": partes asignadas a mí que no están subidas, ordenadas por plazo
 export default function MyTasks() {
-  const { userId, clientById, version, profile } = useStudio()
+  const { userId, clientById, version, profile, assignableFor } = useStudio()
   const [parts, setParts] = useState(null)
   const [pending, setPending] = useState([])
   const [error, setError] = useState(null)
@@ -20,7 +21,7 @@ export default function MyTasks() {
     try {
       const [myParts, pieces] = await Promise.all([
         q(supabase.from('piece_parts')
-          .select('*, piece:pieces(id, title, number, publish_date, status, client_id, grid_id)')
+          .select('*, piece:pieces(id, title, number, publish_date, status, client_id, grid_id, script)')
           .eq('assignee_id', userId).neq('status', 'subido')),
         // Piezas de mis clientes que siguen esperando material (para quienes suben por pieza)
         q(supabase.from('pieces').select('id, title, number, publish_date, status, client_id, grid_id')
@@ -79,7 +80,10 @@ export default function MyTasks() {
                     {part.description}{part.piece.publish_date && ` · se publica ${shortDate(part.piece.publish_date)}`}
                   </p>
                   {part.note && <p className="mt-1 text-xs text-foreground-subtle">Tu nota: “{part.note}”</p>}
-                  <div className="mt-3"><PartUploadButton part={part} onDone={load} /></div>
+                  <div className="mt-3 flex flex-wrap items-start gap-2">
+                    <PartUploadButton part={part} onDone={load} />
+                    <MyLinesButton piece={part.piece} people={assignableFor(part.piece.client_id)} userId={userId} />
+                  </div>
                 </Card>
               </li>
             )
@@ -174,5 +178,16 @@ function FolderUpload({ pieces, onClose, onDone }) {
         </div>
       )}
     </Modal>
+  )
+}
+
+// Acceso directo al guion con mis líneas destacadas
+function MyLinesButton({ piece, people, userId }) {
+  const lines = parseScript(piece.script).filter(b => b.type === 'line' && matchSpeaker(b.speaker, people)?.id === userId).length
+  if (!piece.script?.trim()) return null
+  return (
+    <Button size="sm" variant="outline" onClick={() => openPiece(piece.id, 'guion')}>
+      <BookOpenText size={14} /> {lines ? `Mi guion · ${lines} ${lines === 1 ? 'línea' : 'líneas'}` : 'Ver guion'}
+    </Button>
   )
 }
