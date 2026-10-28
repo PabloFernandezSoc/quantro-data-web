@@ -17,10 +17,12 @@ export function navigate(path) {
 }
 
 // El detalle de pieza se abre como modal sobre cualquier sección (?pieza=<id>)
-export function openPiece(id) {
+export function openPiece(id, vista) {
   const url = new URL(window.location.href)
   if (id) url.searchParams.set('pieza', id)
   else url.searchParams.delete('pieza')
+  if (id && vista) url.searchParams.set('vista', vista)
+  else url.searchParams.delete('vista')
   navigate(url.pathname + url.search)
 }
 
@@ -62,7 +64,7 @@ export function StudioProvider({ session, children }) {
         q(supabase.from('profiles').select('*').eq('id', userId).maybeSingle()),
         q(supabase.from('clients').select('*').order('name')),
         q(supabase.from('client_members').select('*')),
-        q(supabase.from('profiles').select('id, full_name, email, is_admin, active').order('full_name')),
+        q(supabase.from('profiles').select('id, full_name, email, is_admin, active, alias').order('full_name')),
       ])
       setProfile(prof)
       setClients(cls)

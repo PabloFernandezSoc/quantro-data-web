@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, RotateCcw, Upload, MessageSquare } from 'lucide-react'
+import { Plus, Trash2, RotateCcw, Upload, MessageSquare, Wand2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q, rpc, PIECE_SELECT } from '../lib/api'
 import { useStudio } from '../lib/store'
@@ -8,7 +8,9 @@ import { deadlines, shortDate } from '../lib/dates'
 import {
   Modal, Button, Input, Textarea, Select, Field, Avatar, PartBadge, StatusBadge, DueBadge, LinkOut, Spinner, ErrorNote,
 } from './ui'
-import { PartUploadButton, ReviewActions, UploadForm } from './Actions'
+import { PartUploadButton, ReviewActions, UploadForm, Segmented } from './Actions'
+import ScriptView from './ScriptView'
+import { parseScript, speakersOf, matchSpeaker } from '../lib/script'
 
 const EDITABLE = [
   'title', 'number', 'format', 'pillar', 'hook', 'script', 'caption', 'publish_date', 'status',
@@ -36,6 +38,7 @@ export default function PieceDetail({ pieceId, onClose }) {
   const [newComment, setNewComment] = useState('')
   const [newPart, setNewPart] = useState({ assignee_id: '', description: '' })
   const [uploadingPiece, setUploadingPiece] = useState(false)
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get('vista'))
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +65,7 @@ export default function PieceDetail({ pieceId, onClose }) {
 
   const client = clientById[piece.client_id]
   const editable = canEdit(piece.client_id)
+  const activeTab = tab || (piece.script?.trim() ? 'guion' : 'produccion')
   const { materialDue, scheduleDue } = deadlines(piece, client)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
   const dirty = EDITABLE.some(k => String(form[k] ?? '') !== String(piece[k] ?? ''))
@@ -118,6 +122,15 @@ export default function PieceDetail({ pieceId, onClose }) {
 
   const assignable = assignableFor(piece.client_id)
 
+  // Una parte pendiente por cada persona que habla en el guion y aún no tiene parte
+  const speakerPeople = speakersOf(parseScript(piece.script))
+    .map(s => matchSpeaker(s, assignable)).filter(Boolean)
+  const missingFromScript = [...new Map(speakerPeople.map(p => [p.id, p])).values()]
+    .filter(p => !piece.parts.some(part => part.assignee_id === p.id))
+  const partsFromScript = act(() => q(supabase.from('piece_parts').insert(
+    missingFromScript.map(p => ({ piece_id: piece.id, assignee_id: p.id, description: 'Sus líneas del guion' })),
+  )))
+
   return (
     <Modal open onClose={onClose} wide title={`${piece.number ? `#${piece.number} · ` : ''}${piece.title}`}>
       <div className="space-y-6">
@@ -133,6 +146,42 @@ export default function PieceDetail({ pieceId, onClose }) {
 
         <ErrorNote>{error}</ErrorNote>
 
+        <Segmented
+          value={activeTab}
+          onChange={setTab}
+          options={[
+            { key: 'guion', label: 'Guion' },
+            { key: 'produccion', label: `Producción${piece.parts.length ? ` · ${piece.parts.filter(p => p.status === 'subido').length}/${piece.parts.length}` : ''}` },
+            { key: 'ficha', label: 'Ficha' },
+            { key: 'conversacion', label: `Conversación${comments.length ? ` · ${comments.length}` : ''}` },
+          ]}
+        />
+
+        {activeTab === 'guion' && (
+          <div className="space-y-5">
+            {piece.hook && (
+              <div className="rounded-xl border border-accent/30 bg-accent/10 p-4">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent">Gancho</p>
+                <p className="text-lg font-medium leading-snug">{piece.hook}</p>
+              </div>
+            )}
+            <ScriptView key={piece.id} script={piece.script} clientId={piece.client_id} />
+            {piece.notes && (
+              <details className="rounded-xl border border-border p-4" open={!piece.script?.trim()}>
+                <summary className="cursor-pointer text-sm font-semibold">Indicaciones de grabación y edición</summary>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground-muted">{piece.notes}</p>
+              </details>
+            )}
+            {piece.caption && (
+              <details className="rounded-xl border border-border p-4">
+                <summary className="cursor-pointer text-sm font-semibold">Copy de publicación</summary>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground-muted">{piece.caption}</p>
+              </details>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'produccion' && <>
         {piece.status === 'material_por_revisar' && editable && (
           <section>
             <h3 className="mb-2 text-sm font-semibold">Revisión de material</h3>
@@ -194,6 +243,11 @@ export default function PieceDetail({ pieceId, onClose }) {
               <Button variant="outline" onClick={addPart}><Plus size={14} /> Agregar</Button>
             </div>
           )}
+          {editable && missingFromScript.length > 0 && (
+            <Button size="sm" variant="ghost" className="mt-2" onClick={partsFromScript}>
+              <Wand2 size={14} /> Crear partes desde el guion ({missingFromScript.map(p => p.full_name).join(', ')})
+            </Button>
+          )}
         </section>
 
         {/* Material a nivel de pieza */}
@@ -223,10 +277,11 @@ export default function PieceDetail({ pieceId, onClose }) {
             )
           )}
         </section>
+        </>}
 
         {/* Ficha */}
+        {activeTab === 'ficha' && (
         <section>
-          <h3 className="mb-2 text-sm font-semibold">Ficha</h3>
           {editable ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Título" className="sm:col-span-2"><Input value={form.title} onChange={set('title')} /></Field>
@@ -249,12 +304,12 @@ export default function PieceDetail({ pieceId, onClose }) {
                 </Select>
               </Field>
               <Field label="Gancho" className="sm:col-span-2"><Input value={form.hook} onChange={set('hook')} /></Field>
-              <Field label="Guion / estructura" className="sm:col-span-2"><Textarea value={form.script} onChange={set('script')} className="min-h-28" /></Field>
+              <Field label="Guion" hint="Escribe cada línea como NOMBRE: texto (ej. JIMMY: ... / JT: ...) para que se asigne a cada persona." className="sm:col-span-2"><Textarea value={form.script} onChange={set('script')} className="min-h-64 font-mono text-[13px]" /></Field>
               <Field label="Copy" className="sm:col-span-2"><Textarea value={form.caption} onChange={set('caption')} /></Field>
               <Field label="Link material en bruto"><Input type="url" value={form.drive_raw_url} onChange={set('drive_raw_url')} /></Field>
               <Field label="Link video editado"><Input type="url" value={form.drive_edited_url} onChange={set('drive_edited_url')} /></Field>
               <Field label="Link publicación (IG)"><Input type="url" value={form.published_url} onChange={set('published_url')} /></Field>
-              <Field label="Notas"><Input value={form.notes} onChange={set('notes')} /></Field>
+              <Field label="Indicaciones de grabación y edición" className="sm:col-span-2"><Textarea value={form.notes} onChange={set('notes')} className="min-h-40" /></Field>
             </div>
           ) : (
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -262,11 +317,9 @@ export default function PieceDetail({ pieceId, onClose }) {
                 ['Formato', FORMATS.find(f => f.key === piece.format)?.label],
                 ['Pilar', piece.pillar],
                 ['Gancho', piece.hook],
-                ['Guion', piece.script],
-                ['Copy', piece.caption],
-                ['Notas', piece.notes],
+                ['Campaña', CAMPAIGNS.find(c => c.key === piece.campaign_target)?.label],
               ].filter(([, v]) => v).map(([k, v]) => (
-                <div key={k} className={k === 'Guion' || k === 'Copy' ? 'sm:col-span-2' : ''}>
+                <div key={k} className={k === 'Gancho' ? 'sm:col-span-2' : ''}>
                   <dt className="text-xs text-foreground-muted">{k}</dt>
                   <dd className="whitespace-pre-wrap">{v}</dd>
                 </div>
@@ -280,7 +333,9 @@ export default function PieceDetail({ pieceId, onClose }) {
             </div>
           )}
         </section>
+        )}
 
+        {activeTab === 'conversacion' && <>
         {/* Comentarios */}
         <section>
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><MessageSquare size={14} /> Comentarios</h3>
@@ -318,6 +373,7 @@ export default function PieceDetail({ pieceId, onClose }) {
             ))}
           </ul>
         </section>
+        </>}
       </div>
     </Modal>
   )

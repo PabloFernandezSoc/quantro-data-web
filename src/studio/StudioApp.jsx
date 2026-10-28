@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ListChecks, Inbox, LayoutGrid, Table2, CalendarDays, ClipboardPaste, BarChart3, UserCog, CircleUser, LogOut, Menu, X,
+  ListChecks, BookOpenText, Inbox, LayoutGrid, Table2, CalendarDays, ClipboardPaste, BarChart3, UserCog, CircleUser, LogOut, Menu, X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { LogoMark } from '../components/Logo'
@@ -9,6 +9,7 @@ import { Spinner, ErrorNote, cx } from './components/ui'
 import PieceDetail from './components/PieceDetail'
 import Login from './pages/Login'
 import MyTasks from './pages/MyTasks'
+import Scripts from './pages/Scripts'
 import ReviewQueue from './pages/ReviewQueue'
 import Board from './pages/Board'
 import GridView from './pages/GridView'
@@ -40,6 +41,7 @@ export default function StudioApp() {
 
 const PAGES = {
   pendientes: { label: 'Mis pendientes', icon: ListChecks, component: MyTasks },
+  guiones: { label: 'Guiones', icon: BookOpenText, component: Scripts },
   revisar: { label: 'Por revisar', icon: Inbox, component: ReviewQueue, editors: true },
   tablero: { label: 'Tablero', icon: LayoutGrid, component: Board },
   grilla: { label: 'Grilla', icon: Table2, component: GridView },

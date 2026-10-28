@@ -40,7 +40,12 @@ async function setMemberships(sb, userId, memberships) {
   if (rows.length) await must(sb.from('client_members').insert(rows))
 }
 
-async function createUser(sb, { full_name, email, password, is_admin, memberships }) {
+function cleanAlias(alias) {
+  const a = String(alias || '').trim()
+  return a ? a.slice(0, 30) : null
+}
+
+async function createUser(sb, { full_name, alias, email, password, is_admin, memberships }) {
   if (!full_name?.trim() || !email?.trim()) throw new HttpError(400, 'Nombre y email son obligatorios')
   if (!password || password.length < 8) throw new HttpError(400, 'La contraseña debe tener al menos 8 caracteres')
   const { data, error } = await sb.auth.admin.createUser({
@@ -52,7 +57,7 @@ async function createUser(sb, { full_name, email, password, is_admin, membership
   if (error) throw new HttpError(400, error.message.includes('already') ? 'Ya existe un usuario con ese email' : error.message)
   const id = data.user.id
   try {
-    await must(sb.from('profiles').insert({ id, full_name: full_name.trim(), email: email.trim().toLowerCase(), is_admin: !!is_admin }))
+    await must(sb.from('profiles').insert({ id, full_name: full_name.trim(), alias: cleanAlias(alias), email: email.trim().toLowerCase(), is_admin: !!is_admin }))
     await setMemberships(sb, id, memberships)
   } catch (e) {
     await sb.auth.admin.deleteUser(id)
@@ -110,6 +115,7 @@ export default async function handler(req, res) {
         if (error) throw new HttpError(400, error.message)
         await must(sb.from('profiles').update({
           full_name: String(p.full_name || '').trim(),
+          alias: cleanAlias(p.alias),
           email,
           // Nadie se quita a sí mismo el admin ni se desactiva (evita quedar sin acceso)
           ...(isSelf ? {} : { is_admin: !!p.is_admin, active: p.active !== false }),
