@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, RotateCcw, Upload, MessageSquare, Wand2 } from 'lucide-react'
+import { Plus, Trash2, RotateCcw, Upload, MessageSquare, Wand2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q, rpc, PIECE_SELECT } from '../lib/api'
-import { useStudio } from '../lib/store'
+import { useStudio, openPiece, getPieceNav } from '../lib/store'
 import { STATUSES, STATUS, FORMATS, CAMPAIGNS, PRE_MATERIAL } from '../lib/constants'
-import { deadlines, shortDate } from '../lib/dates'
+import { deadlines, shortDate, nextStep, dateParts } from '../lib/dates'
 import {
-  Modal, Button, Input, Textarea, Select, Field, Avatar, PartBadge, StatusBadge, DueBadge, LinkOut, Spinner, ErrorNote,
+  Modal, Button, Input, Textarea, Select, Field, Avatar, PartBadge, StatusBadge, LinkOut, Spinner, ErrorNote,
+  DateBlock, DeadlineChip,
 } from './ui'
 import { PartUploadButton, ReviewActions, UploadForm, Segmented } from './Actions'
 import ScriptView from './ScriptView'
@@ -59,6 +60,21 @@ export default function PieceDetail({ pieceId, onClose }) {
 
   useEffect(() => { load() }, [load, version])
 
+  // Anterior / siguiente según el orden de la vista desde donde se abrió (flechas ← →)
+  const nav = getPieceNav()
+  const navIdx = nav.indexOf(pieceId)
+  const prevId = navIdx > 0 ? nav[navIdx - 1] : null
+  const nextId = navIdx >= 0 && navIdx < nav.length - 1 ? nav[navIdx + 1] : null
+  useEffect(() => {
+    const onKey = e => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      if (e.key === 'ArrowLeft' && prevId) openPiece(prevId, tab || undefined)
+      if (e.key === 'ArrowRight' && nextId) openPiece(nextId, tab || undefined)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [prevId, nextId, tab])
+
   if (!piece || !form) {
     return <Modal open onClose={onClose} title="Pieza">{error ? <ErrorNote>{error}</ErrorNote> : <Spinner />}</Modal>
   }
@@ -66,6 +82,15 @@ export default function PieceDetail({ pieceId, onClose }) {
   const client = clientById[piece.client_id]
   const editable = canEdit(piece.client_id)
   const activeTab = tab || (piece.script?.trim() ? 'guion' : 'produccion')
+  const step = nextStep(piece, client)
+  const pub = dateParts(piece.publish_date)
+  const navButtons = nav.length > 1 && navIdx >= 0 && (
+    <>
+      <button className="rounded-md p-1 text-foreground-muted hover:bg-surface-hover disabled:opacity-30" disabled={!prevId} onClick={() => openPiece(prevId, activeTab)} aria-label="Pieza anterior" title="Anterior (←)"><ChevronLeft size={18} /></button>
+      <span className="text-xs tabular-nums text-foreground-subtle">{navIdx + 1}/{nav.length}</span>
+      <button className="rounded-md p-1 text-foreground-muted hover:bg-surface-hover disabled:opacity-30" disabled={!nextId} onClick={() => openPiece(nextId, activeTab)} aria-label="Pieza siguiente" title="Siguiente (→)"><ChevronRight size={18} /></button>
+    </>
+  )
   const { materialDue, scheduleDue } = deadlines(piece, client)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
   const dirty = EDITABLE.some(k => String(form[k] ?? '') !== String(piece[k] ?? ''))
@@ -132,16 +157,25 @@ export default function PieceDetail({ pieceId, onClose }) {
   )))
 
   return (
-    <Modal open onClose={onClose} wide title={`${piece.number ? `#${piece.number} · ` : ''}${piece.title}`}>
+    <Modal open onClose={onClose} wide headerExtra={navButtons} title={`${piece.number ? `#${piece.number} · ` : ''}${piece.title}`}>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium" style={{ color: client?.color }}>{client?.name}</span>
-          <StatusBadge status={piece.status} />
-          {piece.publish_date && <span className="text-xs text-foreground-muted">Publica {shortDate(piece.publish_date)}</span>}
-          {PRE_MATERIAL.includes(piece.status) && <DueBadge due={materialDue} />}
-          {scheduleDue && !['programada', 'publicada', 'descartada'].includes(piece.status) && (
-            <span className="text-xs text-foreground-subtle">Programar a más tardar {shortDate(scheduleDue)}</span>
-          )}
+        <div className="flex items-center gap-4">
+          <DateBlock date={piece.publish_date} level={step.level} size="lg" />
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-sm">
+              <span className="font-medium" style={{ color: client?.color }}>{client?.name}</span>
+              <span className="text-foreground-muted"> · {pub ? `se publica el ${pub.weekday} ${pub.day} de ${pub.month}` : 'sin fecha de publicación'}</span>
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={piece.status} />
+              <DeadlineChip step={step} />
+            </div>
+            {piece.publish_date && !['publicada', 'descartada'].includes(piece.status) && (
+              <p className="text-xs text-foreground-subtle">
+                {PRE_MATERIAL.includes(piece.status) && <>Material hasta el {shortDate(materialDue)} · </>}Programar hasta el {shortDate(scheduleDue)}
+              </p>
+            )}
+          </div>
         </div>
 
         <ErrorNote>{error}</ErrorNote>

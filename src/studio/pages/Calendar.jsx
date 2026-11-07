@@ -1,4 +1,5 @@
-import { useStudio, openPiece } from '../lib/store'
+import { useEffect } from 'react'
+import { useStudio, openPiece, setPieceNav } from '../lib/store'
 import { useGrid } from '../lib/useGrid'
 import { STATUS } from '../lib/constants'
 import { parseISODate, toISODate, today, monthLabel } from '../lib/dates'
@@ -22,6 +23,7 @@ export default function Calendar() {
   for (const p of pieces) if (p.publish_date) (byDate[p.publish_date] ||= []).push(p)
   const unscheduled = pieces.filter(p => !p.publish_date)
   const now = today()
+  useEffect(() => { setPieceNav([...pieces].filter(p => p.publish_date).sort((a, b) => a.publish_date.localeCompare(b.publish_date)).map(p => p.id)) }, [pieces])
 
   return (
     <div>

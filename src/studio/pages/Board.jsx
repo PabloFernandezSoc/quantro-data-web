@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, LayoutGrid } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q } from '../lib/api'
-import { useStudio, openPiece, navigate } from '../lib/store'
+import { useStudio, openPiece, navigate, setPieceNav } from '../lib/store'
 import { useGrid } from '../lib/useGrid'
 import { STATUSES, PRE_MATERIAL } from '../lib/constants'
-import { deadlines, shortDate, monthLabel } from '../lib/dates'
-import { Button, PageHeader, Empty, Spinner, ErrorNote, Avatar, Dot, Badge, cx } from '../components/ui'
+import { nextStep, dateParts, monthLabel } from '../lib/dates'
+import { Button, PageHeader, Empty, Spinner, ErrorNote, Avatar, Badge, DeadlineChip, LEVEL_STYLE, cx } from '../components/ui'
 import { ClientPicker, MonthPicker } from '../components/Pickers'
 import NewPiece from '../components/NewPiece'
 
@@ -20,6 +20,9 @@ export default function Board() {
   const editable = client && canEdit(client.id)
 
   const columns = STATUSES.filter(s => s.key !== 'descartada' || showDiscarded)
+  useEffect(() => {
+    setPieceNav(columns.flatMap(col => pieces.filter(p => p.status === col.key).map(p => p.id)))
+  }, [pieces, showDiscarded]) // eslint-disable-line react-hooks/exhaustive-deps
   const nextNumber = Math.max(0, ...pieces.map(p => p.number || 0)) + 1
 
   const move = async (pieceId, status) => {
@@ -88,22 +91,26 @@ export default function Board() {
 }
 
 export function PieceCard({ piece, client, personById, draggable, onDragStart }) {
-  const { materialDue } = deadlines(piece, client)
+  const step = nextStep(piece, client)
   const missing = piece.parts.filter(p => p.status !== 'subido')
   const waiting = PRE_MATERIAL.includes(piece.status)
+  const pub = dateParts(piece.publish_date)
+  const color = LEVEL_STYLE[step.level].color
+  const urgent = ['late', 'today', 'soon'].includes(step.level)
   return (
     <button
       draggable={draggable}
       onDragStart={onDragStart}
       onClick={() => openPiece(piece.id)}
       className="block w-full rounded-lg border border-border bg-bg-elevated p-3 text-left hover:border-border-hover"
+      style={urgent ? { borderColor: `${color}77`, boxShadow: `inset 3px 0 0 ${color}` } : undefined}
     >
-      <div className="flex items-start gap-2">
-        {waiting && <span className="mt-1.5"><Dot due={materialDue} /></span>}
-        <p className="text-sm font-medium leading-snug">{piece.number ? `#${piece.number} · ` : ''}{piece.title}</p>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted">
-        <span>{shortDate(piece.publish_date)}</span>
+      <p className="mb-1 text-xs font-bold uppercase tracking-wide" style={{ color: step.level === 'done' ? undefined : color }}>
+        {pub ? `${pub.weekday.slice(0, 3)} ${pub.day} ${pub.month}` : 'Sin fecha'}
+      </p>
+      <p className="text-sm font-medium leading-snug">{piece.number ? `#${piece.number} · ` : ''}{piece.title}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <DeadlineChip step={step} compact short />
         {piece.pillar && <Badge>{piece.pillar}</Badge>}
       </div>
       {waiting && missing.length > 0 && (
