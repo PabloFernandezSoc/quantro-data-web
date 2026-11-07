@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { X, LoaderCircle, ExternalLink } from 'lucide-react'
 import { STATUS, PART_STATUS } from '../lib/constants'
-import { relativeDays, shortDate, urgency } from '../lib/dates'
+import { relativeDays, shortDate, urgency, dateParts, countdown } from '../lib/dates'
 
 export function cx(...c) {
   return c.filter(Boolean).join(' ')
@@ -117,7 +117,7 @@ export function LinkOut({ href, children }) {
   )
 }
 
-export function Modal({ open, onClose, title, children, wide }) {
+export function Modal({ open, onClose, title, children, wide, headerExtra }) {
   useEffect(() => {
     if (!open) return
     const onKey = e => e.key === 'Escape' && onClose()
@@ -136,10 +136,13 @@ export function Modal({ open, onClose, title, children, wide }) {
         onMouseDown={e => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg-base px-4 py-3">
-          <h2 className="text-base font-semibold">{title}</h2>
+          <h2 className="min-w-0 truncate text-base font-semibold">{title}</h2>
+          <div className="flex shrink-0 items-center gap-1">
+          {headerExtra}
           <button onClick={onClose} className="rounded-md p-1 text-foreground-muted hover:bg-surface-hover" aria-label="Cerrar">
             <X size={18} />
           </button>
+          </div>
         </div>
         <div className="p-4">{children}</div>
       </div>
@@ -179,5 +182,55 @@ export function PageHeader({ title, subtitle, children }) {
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
+  )
+}
+
+export const LEVEL_STYLE = {
+  late: { color: '#EF4444', label: 'Atrasada' },
+  today: { color: '#F97316', label: 'Hoy' },
+  soon: { color: '#F59E0B', label: 'Urgente' },
+  week: { color: '#EAB308', label: 'Esta semana' },
+  ok: { color: '#22C55E', label: 'A tiempo' },
+  done: { color: '#4A505A', label: 'Lista' },
+}
+
+// Bloque grande de fecha de publicación (día + mes + día de la semana)
+export function DateBlock({ date, level = 'ok', size = 'md' }) {
+  const parts = dateParts(date)
+  const color = LEVEL_STYLE[level]?.color
+  const big = size === 'lg'
+  return (
+    <div
+      className={cx('flex shrink-0 flex-col items-center justify-center rounded-xl border text-center leading-none', big ? 'h-20 w-20' : 'h-16 w-16')}
+      style={{ borderColor: `${color}55`, background: `${color}14` }}
+    >
+      {parts ? (
+        <>
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color }}>{parts.month}</span>
+          <span className={cx('font-display font-bold', big ? 'text-3xl' : 'text-2xl')}>{parts.day}</span>
+          <span className="mt-0.5 text-[10px] text-foreground-muted">{parts.weekday.slice(0, 3)}</span>
+        </>
+      ) : (
+        <span className="text-[11px] text-foreground-subtle">sin<br />fecha</span>
+      )}
+    </div>
+  )
+}
+
+// Próximo plazo: "Subir material · faltan 2 días" con color según urgencia
+export function DeadlineChip({ step, compact, short }) {
+  if (!step || step.level === 'done') return null
+  const { color } = LEVEL_STYLE[step.level]
+  const urgent = ['late', 'today', 'soon'].includes(step.level)
+  return (
+    <span
+      className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold', compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs')}
+      style={{ background: `${color}22`, color }}
+    >
+      {urgent && <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: color }} />}
+      {short
+        ? countdown(step.days) || step.label
+        : <>{step.label}{step.due ? ` · ${shortDate(step.due)}` : ''}{step.days != null ? ` · ${countdown(step.days)}` : ''}</>}
+    </span>
   )
 }

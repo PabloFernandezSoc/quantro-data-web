@@ -94,3 +94,57 @@ export function parseLooseDate(raw, refMonth) {
   }
   return null
 }
+
+// Próximo hito de la pieza según su estado: qué hay que hacer, para cuándo y qué tan urgente es.
+// level: 'late' (vencido), 'today', 'soon' (≤ 2 días), 'week' (≤ 7 días), 'ok', 'done'
+export function nextStep(piece, client) {
+  const { materialDue, scheduleDue } = deadlines(piece, client)
+  let label, due
+  switch (piece.status) {
+    case 'idea':
+    case 'aprobada':
+    case 'en_grabacion':
+      label = 'Subir material'; due = materialDue; break
+    case 'material_por_revisar':
+      label = 'Revisar material'; due = materialDue; break
+    case 'material_completo':
+    case 'en_edicion':
+    case 'editada':
+      label = 'Editar y programar'; due = scheduleDue; break
+    case 'programada':
+      label = 'Se publica'; due = piece.publish_date; break
+    default:
+      return { label: piece.status === 'publicada' ? 'Publicada' : 'Descartada', due: null, days: null, level: 'done' }
+  }
+  if (!due) return { label, due: null, days: null, level: 'ok' }
+  const days = daysUntil(due)
+  // Una pieza programada no está "atrasada": solo indica cuándo sale
+  const level = piece.status === 'programada'
+    ? (days <= 0 ? 'today' : 'ok')
+    : days < 0 ? 'late' : days === 0 ? 'today' : days <= 2 ? 'soon' : days <= 7 ? 'week' : 'ok'
+  return { label, due, days, level }
+}
+
+export function countdown(days) {
+  if (days == null) return ''
+  if (days === 0) return 'hoy'
+  if (days === 1) return 'mañana'
+  if (days === -1) return 'venció ayer'
+  return days > 0 ? `faltan ${days} días` : `atrasada ${-days} días`
+}
+
+const WEEKDAYS_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+export function dateParts(s) {
+  const d = parseISODate(s)
+  if (!d) return null
+  return { day: d.getDate(), weekday: WEEKDAYS_LONG[d.getDay()], month: MONTHS_SHORT[d.getMonth()] }
+}
+
+// Lunes de la semana de una fecha (para agrupar la grilla por semana)
+export function weekStart(s) {
+  const d = parseISODate(s)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return toISODate(d)
+}
