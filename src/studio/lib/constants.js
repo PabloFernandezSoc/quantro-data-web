@@ -36,7 +36,8 @@ export const CAMPAIGNS = [
 export const ROLES = [
   { key: 'editor', label: 'Edición', hint: 'Edita piezas y confirma material' },
   { key: 'talent', label: 'Rostro', hint: 'Ve la grilla y sube sus partes' },
-  { key: 'client', label: 'Cliente', hint: 'Ve la grilla, sube material y comenta' },
+  { key: 'client', label: 'Cliente', hint: 'Ve la grilla, sube material, comenta y ve su publicidad' },
+  { key: 'ads', label: 'Solo publicidad', hint: 'Ve solo el reporte de publicidad (Meta Ads)' },
 ]
 
 export const GRID_STATUSES = [

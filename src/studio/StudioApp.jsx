@@ -41,29 +41,30 @@ export default function StudioApp() {
 }
 
 const PAGES = {
-  pendientes: { label: 'Mis pendientes', icon: ListChecks, component: MyTasks },
-  guiones: { label: 'Guiones', icon: BookOpenText, component: Scripts },
-  revisar: { label: 'Por revisar', icon: Inbox, component: ReviewQueue, editors: true },
-  tablero: { label: 'Tablero', icon: LayoutGrid, component: Board },
-  grilla: { label: 'Grilla', icon: Table2, component: GridView },
-  calendario: { label: 'Calendario', icon: CalendarDays, component: Calendar },
-  importar: { label: 'Importar Sheet', icon: ClipboardPaste, component: ImportGrid, editors: true },
-  publicidad: { label: 'Publicidad', icon: Megaphone, component: Ads },
-  metricas: { label: 'Métricas', icon: BarChart3, component: Metrics, editors: true },
+  pendientes: { label: 'Mis pendientes', icon: ListChecks, component: MyTasks, content: true },
+  guiones: { label: 'Guiones', icon: BookOpenText, component: Scripts, content: true },
+  revisar: { label: 'Por revisar', icon: Inbox, component: ReviewQueue, editors: true, content: true },
+  tablero: { label: 'Tablero', icon: LayoutGrid, component: Board, content: true },
+  grilla: { label: 'Grilla', icon: Table2, component: GridView, content: true },
+  calendario: { label: 'Calendario', icon: CalendarDays, component: Calendar, content: true },
+  importar: { label: 'Importar Sheet', icon: ClipboardPaste, component: ImportGrid, editors: true, content: true },
+  publicidad: { label: 'Publicidad', icon: Megaphone, component: Ads, ads: true },
+  metricas: { label: 'Métricas', icon: BarChart3, component: Metrics, editors: true, content: true },
   admin: { label: 'Administración', icon: UserCog, component: Admin, admin: true },
   cuenta: { label: 'Mi cuenta', icon: CircleUser, component: Account },
 }
 
 function Shell() {
-  const { path, profile, isAdmin, isEditorAnywhere, loading, error } = useStudio()
+  const { path, profile, isAdmin, isEditorAnywhere, hasContent, hasAds, loading, error } = useStudio()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const url = new URL(path, window.location.origin)
   const slug = url.pathname.replace(/^\/app\/?/, '').split('/')[0]
   const pieceId = url.searchParams.get('pieza')
-  const visible = Object.entries(PAGES).filter(([, p]) => (!p.editors || isEditorAnywhere) && (!p.admin || isAdmin))
+  const visible = Object.entries(PAGES).filter(([, p]) => (!p.editors || isEditorAnywhere) && (!p.admin || isAdmin)
+    && (!p.content || hasContent) && (!p.ads || hasAds || isAdmin))
   // Inicio según rol: edición parte en "Por revisar", el resto en sus pendientes
-  const fallback = isEditorAnywhere ? 'revisar' : 'pendientes'
+  const fallback = !hasContent && hasAds ? 'publicidad' : isEditorAnywhere ? 'revisar' : 'pendientes'
   const current = visible.find(([k]) => k === slug) ? slug : fallback
   const Page = PAGES[current].component
 

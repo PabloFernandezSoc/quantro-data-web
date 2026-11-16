@@ -7,7 +7,8 @@
 --   client_members.role:
 --     'editor'  → Vale: edita piezas del cliente y confirma material.
 --     'talent'  → JT / Jimmy: ve las grillas del cliente, marca sus partes como subidas.
---     'client'  → contacto del cliente: ve las grillas, sube material y comenta.
+--     'client'  → contacto del cliente: ve las grillas, sube material, comenta y ve su publicidad.
+--     'ads'     → contacto del cliente que solo ve la sección Publicidad.
 -- Los usuarios se crean desde la app (api/admin-users.js con service role).
 -- ─────────────────────────────────────────────────────────────
 
@@ -504,3 +505,39 @@ create policy "ad_ops_log_admin"  on public.ad_ops_log for all to authenticated 
 
 -- Jerarquía campaña / conjunto para el explorador Cuenta → Campaña → Anuncios
 alter table public.ad_ads add column if not exists campaign_id text, add column if not exists adset_id text, add column if not exists adset_name text;
+
+-- ── Rol "Solo publicidad" ('ads') ────────────────────────────
+-- 'ads'    → contacto del cliente que solo ve /app/publicidad (sin grillas ni piezas).
+-- 'client' → ve producción y además su publicidad. Edición y rostros NO ven el gasto.
+alter table public.client_members drop constraint if exists client_members_role_check;
+alter table public.client_members add constraint client_members_role_check check (role in ('editor', 'talent', 'client', 'ads'));
+
+create or replace function public.can_view_client(cid uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.is_admin() or coalesce(public.member_role(cid) in ('editor', 'talent', 'client'), false)
+$$;
+
+create or replace function public.can_view_ads(cid uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.is_admin() or coalesce(public.member_role(cid) in ('client', 'ads'), false)
+$$;
+revoke execute on function public.can_view_ads(uuid) from public, anon;
+grant execute on function public.can_view_ads(uuid) to authenticated;
+
+drop policy if exists "clients_select" on public.clients;
+create policy "clients_select" on public.clients for select to authenticated
+  using (public.can_view_client(id) or public.can_view_ads(id));
+drop policy if exists "members_select" on public.client_members;
+create policy "members_select" on public.client_members for select to authenticated
+  using (public.can_view_client(client_id) or (public.can_view_ads(client_id) and user_id = auth.uid()));
+
+drop policy if exists "ad_accounts_select" on public.ad_accounts;
+create policy "ad_accounts_select" on public.ad_accounts for select to authenticated using (public.can_view_ads(client_id));
+drop policy if exists "ad_monthly_select" on public.ad_monthly;
+create policy "ad_monthly_select" on public.ad_monthly for select to authenticated
+  using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_ads(a.client_id)));
+drop policy if exists "ad_ads_select" on public.ad_ads;
+create policy "ad_ads_select" on public.ad_ads for select to authenticated
+  using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_ads(a.client_id)));
+drop policy if exists "ad_ops_log_select" on public.ad_ops_log;
+create policy "ad_ops_log_select" on public.ad_ops_log for select to authenticated using (public.can_view_ads(client_id));

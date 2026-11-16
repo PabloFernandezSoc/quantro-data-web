@@ -11,7 +11,7 @@ class HttpError extends Error {
   }
 }
 
-const VALID_ROLES = ['editor', 'talent', 'client']
+const VALID_ROLES = ['editor', 'talent', 'client', 'ads']
 
 function cleanMemberships(list) {
   if (!Array.isArray(list)) return []

@@ -20,7 +20,8 @@ const STATUS_LABEL = { ACTIVE: 'Activo', PAUSED: 'Pausado', ARCHIVED: 'Archivado
 
 // Publicidad: inversión en Meta Ads por cliente y qué videos traen conversaciones
 export default function Ads() {
-  const { clients, clientId, setClientId } = useStudio()
+  const { adsClients: clients, clientId: lastClientId, setClientId } = useStudio()
+  const clientId = clients.some(c => c.id === lastClientId) ? lastClientId : clients[0]?.id || ''
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [brand, setBrand] = useState('all')

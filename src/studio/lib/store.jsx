@@ -46,7 +46,7 @@ function writeStored(key, value) {
 export function StudioProvider({ session, children }) {
   const path = usePath()
   const [profile, setProfile] = useState(null)
-  const [clients, setClients] = useState([])
+  const [allClients, setClients] = useState([])
   const [members, setMembers] = useState([])
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
@@ -98,10 +98,23 @@ export function StudioProvider({ session, children }) {
   const canEdit = useCallback(cid => isAdmin || myRoles[cid] === 'editor', [isAdmin, myRoles])
   const isEditorAnywhere = isAdmin || Object.values(myRoles).includes('editor')
 
+  // Producción (grillas) vs publicidad: el rol 'ads' solo ve Publicidad; producción no ve el gasto
+  const contentClients = useMemo(
+    () => isAdmin ? allClients : allClients.filter(c => myRoles[c.id] && myRoles[c.id] !== 'ads'),
+    [allClients, isAdmin, myRoles],
+  )
+  const adsClients = useMemo(
+    () => isAdmin ? allClients : allClients.filter(c => ['client', 'ads'].includes(myRoles[c.id])),
+    [allClients, isAdmin, myRoles],
+  )
+  const clients = contentClients
+  const hasContent = isAdmin || contentClients.length > 0
+  const hasAds = adsClients.length > 0
+
   // Cliente activo: el guardado si sigue siendo visible, si no el primero
   const activeClientId = clients.some(c => c.id === clientId) ? clientId : clients[0]?.id || ''
   const client = clients.find(c => c.id === activeClientId) || null
-  const clientById = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients])
+  const clientById = useMemo(() => Object.fromEntries(allClients.map(c => [c.id, c])), [allClients])
   const personById = useMemo(() => Object.fromEntries(people.map(p => [p.id, p])), [people])
 
   // Personas asignables a partes de un cliente: sus miembros + admins
@@ -112,7 +125,7 @@ export function StudioProvider({ session, children }) {
 
   const value = {
     session, userId, profile, isAdmin, myRoles, canEdit, isEditorAnywhere,
-    clients, client, clientId: activeClientId, clientById, members, people, personById, assignableFor,
+    clients, adsClients, hasContent, hasAds, client, clientId: activeClientId, clientById, members, people, personById, assignableFor,
     setClientId: id => { setClientIdState(id); writeStored('studio.client', id) },
     month, setMonth: m => { setMonthState(m); writeStored('studio.month', m) },
     path, version, bump: () => setVersion(v => v + 1), reloadBase: loadBase,
