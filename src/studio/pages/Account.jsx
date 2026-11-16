@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useStudio } from '../lib/store'
-import { ROLES } from '../lib/constants'
+import { ROLES, displayLogin } from '../lib/constants'
 import { Button, Card, Input, Field, ErrorNote, PageHeader, Badge } from '../components/ui'
 
 export default function Account() {
@@ -26,7 +26,7 @@ export default function Account() {
 
   return (
     <div className="max-w-md">
-      <PageHeader title="Mi cuenta" subtitle={`${profile?.full_name} · ${profile?.email}`} />
+      <PageHeader title="Mi cuenta" subtitle={`${profile?.full_name} · ${displayLogin(profile?.email)}`} />
       <Card className="mb-4 p-4">
         <p className="mb-2 text-xs font-medium text-foreground-muted">Accesos</p>
         <div className="flex flex-wrap gap-1">

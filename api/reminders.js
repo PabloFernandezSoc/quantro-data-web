@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     const byPerson = new Map()
     for (const part of parts) {
       const pc = part.piece
-      if (!pc?.publish_date || !part.assignee?.active || !part.assignee.email) continue
+      if (!pc?.publish_date || !part.assignee?.active || !part.assignee.email || part.assignee.email.endsWith('@usuarios.quantrodata.com')) continue
       if (!['idea', 'aprobada', 'en_grabacion'].includes(pc.status)) continue
       if (already.has(part.id)) continue
       const due = addDays(pc.publish_date, -(pc.client.schedule_buffer_days + pc.client.edit_buffer_days))

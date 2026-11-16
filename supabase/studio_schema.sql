@@ -541,3 +541,22 @@ create policy "ad_ads_select" on public.ad_ads for select to authenticated
   using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_ads(a.client_id)));
 drop policy if exists "ad_ops_log_select" on public.ad_ops_log;
 create policy "ad_ops_log_select" on public.ad_ops_log for select to authenticated using (public.can_view_ads(client_id));
+
+-- ── Detalle diario por anuncio (filtros de fecha, semana y anuncios ganadores) ──
+create table if not exists public.ad_daily (
+  ad_id       text not null,
+  account_id  text not null references public.ad_accounts (id) on delete cascade,
+  date        date not null,
+  spend       numeric not null default 0,
+  messages    int not null default 0,
+  impressions bigint not null default 0,
+  clicks      int not null default 0,
+  primary key (ad_id, date)
+);
+create index if not exists ad_daily_account_date_idx on public.ad_daily (account_id, date);
+alter table public.ad_daily enable row level security;
+create policy "ad_daily_select" on public.ad_daily for select to authenticated
+  using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_ads(a.client_id)));
+create policy "ad_daily_admin" on public.ad_daily for all to authenticated using (public.is_admin()) with check (public.is_admin());
+-- Cobertura del detalle diario por cuenta (null = sin detalle diario: la app usa el total mensual)
+alter table public.ad_accounts add column if not exists daily_since date, add column if not exists daily_until date;

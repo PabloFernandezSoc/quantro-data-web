@@ -13,6 +13,16 @@ class HttpError extends Error {
 
 const VALID_ROLES = ['editor', 'talent', 'client', 'ads']
 
+// Usuarios sin correo: "tusdeudas" se guarda como tusdeudas@usuarios.quantrodata.com (dominio interno, no recibe correos)
+const LOGIN_DOMAIN = 'usuarios.quantrodata.com'
+function normalizeLogin(value) {
+  const v = String(value || '').trim().toLowerCase()
+  if (!v) throw new HttpError(400, 'Falta el email o nombre de usuario')
+  if (v.includes('@')) return v
+  if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(v)) throw new HttpError(400, 'El usuario solo puede tener letras, números, punto, guion o guion bajo (3 a 40 caracteres)')
+  return `${v}@${LOGIN_DOMAIN}`
+}
+
 function cleanMemberships(list) {
   if (!Array.isArray(list)) return []
   return list.filter(m => m && typeof m.client_id === 'string' && VALID_ROLES.includes(m.role))
@@ -46,18 +56,19 @@ function cleanAlias(alias) {
 }
 
 async function createUser(sb, { full_name, alias, email, password, is_admin, memberships }) {
-  if (!full_name?.trim() || !email?.trim()) throw new HttpError(400, 'Nombre y email son obligatorios')
+  if (!full_name?.trim()) throw new HttpError(400, 'El nombre es obligatorio')
+  email = normalizeLogin(email)
   if (!password || password.length < 8) throw new HttpError(400, 'La contraseña debe tener al menos 8 caracteres')
   const { data, error } = await sb.auth.admin.createUser({
-    email: email.trim().toLowerCase(),
+    email,
     password,
     email_confirm: true,
     user_metadata: { full_name: full_name.trim() },
   })
-  if (error) throw new HttpError(400, error.message.includes('already') ? 'Ya existe un usuario con ese email' : error.message)
+  if (error) throw new HttpError(400, error.message.includes('already') ? 'Ya existe un usuario con ese email o nombre de usuario' : error.message)
   const id = data.user.id
   try {
-    await must(sb.from('profiles').insert({ id, full_name: full_name.trim(), alias: cleanAlias(alias), email: email.trim().toLowerCase(), is_admin: !!is_admin }))
+    await must(sb.from('profiles').insert({ id, full_name: full_name.trim(), alias: cleanAlias(alias), email, is_admin: !!is_admin }))
     await setMemberships(sb, id, memberships)
   } catch (e) {
     await sb.auth.admin.deleteUser(id)
@@ -103,7 +114,7 @@ export default async function handler(req, res) {
       case 'update': {
         if (!p.id) throw new HttpError(400, 'Falta el id')
         const isSelf = p.id === me.id
-        const email = String(p.email || '').trim().toLowerCase()
+        const email = normalizeLogin(p.email)
         const authPatch = { email, user_metadata: { full_name: p.full_name } }
         if (p.password) {
           if (p.password.length < 8) throw new HttpError(400, 'La contraseña debe tener al menos 8 caracteres')

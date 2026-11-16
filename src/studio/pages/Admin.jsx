@@ -3,7 +3,7 @@ import { Plus, KeyRound, Copy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q, adminApi, generatePassword } from '../lib/api'
 import { useStudio } from '../lib/store'
-import { ROLES } from '../lib/constants'
+import { ROLES, displayLogin, toLoginEmail } from '../lib/constants'
 import { Button, Card, PageHeader, Modal, Input, Field, Select, ErrorNote, Spinner, Avatar, Badge, Empty } from '../components/ui'
 import { Segmented } from '../components/Actions'
 
@@ -58,7 +58,7 @@ function Users() {
                 <p className="font-medium">
                   {p.full_name} {p.alias && <span className="text-xs text-foreground-muted">· “{p.alias}” en guiones</span>} {p.id === userId && <span className="text-xs text-foreground-subtle">(tú)</span>}
                 </p>
-                <p className="truncate text-xs text-foreground-muted">{p.email}</p>
+                <p className="truncate text-xs text-foreground-muted">{displayLogin(p.email)}</p>
               </div>
               <div className="flex flex-wrap gap-1">
                 {p.is_admin && <Badge color="#8B5CF6">Admin</Badge>}
@@ -92,7 +92,7 @@ function UserForm({ user, memberships, clients, isSelf, onClose, onSaved }) {
   const [form, setForm] = useState({
     full_name: user?.full_name || '',
     alias: user?.alias || '',
-    email: user?.email || '',
+    email: displayLogin(user?.email || ''),
     password: user ? '' : generatePassword(),
     is_admin: user?.is_admin || false,
     active: user?.active ?? true,
@@ -114,11 +114,11 @@ function UserForm({ user, memberships, clients, isSelf, onClose, onSaved }) {
       }
       if (user) {
         await adminApi('update', { id: user.id, ...payload, password: form.password || undefined })
-        if (form.password) setCreated({ email: form.email, password: form.password })
+        if (form.password) setCreated({ email: displayLogin(toLoginEmail(form.email)), password: form.password })
         else onSaved()
       } else {
         await adminApi('create', payload)
-        setCreated({ email: form.email, password: form.password })
+        setCreated({ email: displayLogin(toLoginEmail(form.email)), password: form.password })
       }
     } catch (err) {
       setError(err.message)
@@ -138,7 +138,9 @@ function UserForm({ user, memberships, clients, isSelf, onClose, onSaved }) {
   }
 
   if (created) {
-    const msg = `Hola! Te creé tu usuario en Quantro Studio para ver las grabaciones pendientes:\n${window.location.origin}/app\nUsuario: ${created.email}\nContraseña: ${created.password}`
+    const assigned = Object.values(roles).filter(Boolean)
+    const purpose = assigned.length && assigned.every(r => r === 'ads') ? 'ver el reporte de publicidad' : assigned.includes('client') ? 'ver tu contenido y tu publicidad' : 'ver las grabaciones pendientes'
+    const msg = `Hola! Te creé tu usuario en el portal de Quantro Data para ${purpose}:\n${window.location.origin}/app\nUsuario: ${created.email}\nContraseña: ${created.password}`
     return (
       <Modal open onClose={onSaved} title="Listo">
         <p className="mb-2 text-sm text-foreground-muted">Mándale estos datos (por WhatsApp, por ejemplo). La contraseña no se vuelve a mostrar.</p>
@@ -158,7 +160,9 @@ function UserForm({ user, memberships, clients, isSelf, onClose, onSaved }) {
         <Field label="Alias en los guiones (opcional)" hint="Cómo aparece en los guiones si no es su primer nombre ni sus iniciales. Ej: JT.">
           <Input value={form.alias} onChange={set('alias')} placeholder="JT" />
         </Field>
-        <Field label="Email (usuario y canal de recordatorios)"><Input type="email" value={form.email} onChange={set('email')} required /></Field>
+        <Field label="Email o nombre de usuario" hint="Con email recibe recordatorios. Para un acceso compartido sin correo (ej. el equipo de un cliente), escribe solo un usuario como tusdeudas.">
+          <Input type="text" autoCapitalize="none" value={form.email} onChange={set('email')} placeholder="nombre@empresa.cl o tusdeudas" required />
+        </Field>
         <Field label={user ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña inicial'}>
           <div className="flex gap-2">
             <Input value={form.password} onChange={set('password')} minLength={8} required={!user} />

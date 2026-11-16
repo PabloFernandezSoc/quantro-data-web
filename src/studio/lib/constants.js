@@ -51,3 +51,13 @@ export const PART_STATUS = {
   subido: { label: 'Subido', color: '#22C55E' },
   rechazado: { label: 'Falta / rehacer', color: '#EF4444' },
 }
+
+// Usuarios sin correo (accesos compartidos, ej. "tusdeudas"): Supabase exige email,
+// así que se guardan con un dominio interno que nunca recibe correos.
+export const LOGIN_DOMAIN = 'usuarios.quantrodata.com'
+export const toLoginEmail = v => {
+  const x = String(v || '').trim().toLowerCase()
+  return !x || x.includes('@') ? x : `${x}@${LOGIN_DOMAIN}`
+}
+export const isUsernameLogin = email => String(email || '').endsWith(`@${LOGIN_DOMAIN}`)
+export const displayLogin = email => isUsernameLogin(email) ? email.split('@')[0] : email

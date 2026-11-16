@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Lock, CheckCircle2, ChevronRight, ArrowUpDown, RefreshCw, Search, Lightbulb, Wrench, Bell } from 'lucide-react'
+import { AlertTriangle, Lock, CheckCircle2, ChevronRight, ArrowUpDown, RefreshCw, Search, Lightbulb, Wrench, Bell, Trophy, CalendarRange } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q } from '../lib/api'
 import { useStudio } from '../lib/store'
-import { Card, PageHeader, Spinner, ErrorNote, Select, Badge, cx } from '../components/ui'
+import { Card, PageHeader, Spinner, ErrorNote, Select, Input, Badge, cx } from '../components/ui'
 
 const clp = n => n == null ? '—' : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const num = n => n == null ? '—' : new Intl.NumberFormat('es-CL').format(n)
 const monthName = iso => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CL', { month: 'short', year: '2-digit' })
+const dayName = iso => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
 const cpm = (spend, msgs) => msgs > 0 ? spend / msgs : null
 
 const SYNC = {
@@ -18,13 +19,62 @@ const SYNC = {
 const OBJECTIVE = { mensajes: 'WhatsApp', trafico: 'Tráfico', web: 'Web' }
 const STATUS_LABEL = { ACTIVE: 'Activo', PAUSED: 'Pausado', ARCHIVED: 'Archivado', CAMPAIGN_PAUSED: 'Campaña pausada', ADSET_PAUSED: 'Conjunto pausado', WITH_ISSUES: 'Con problemas', NOT_DELIVERING: 'Sin entrega', INACTIVE: 'Inactivo', DELETED: 'Eliminado' }
 
-// Publicidad: inversión en Meta Ads por cliente y qué videos traen conversaciones
+// ── Fechas (hora local de Chile) ─────────────────────────────
+const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const addDays = (s, n) => { const d = new Date(`${s}T12:00:00`); d.setDate(d.getDate() + n); return iso(d) }
+const monthStartOf = s => `${s.slice(0, 7)}-01`
+const monthEndOf = s => { const d = new Date(`${s.slice(0, 7)}-01T12:00:00`); d.setMonth(d.getMonth() + 1); d.setDate(0); return iso(d) }
+const weekStartOf = s => { const d = new Date(`${s}T12:00:00`); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return iso(d) }
+
+const PRESETS = [
+  ['all', 'Todo el período'], ['today', 'Hoy'], ['yesterday', 'Ayer'], ['7d', 'Últimos 7 días'], ['30d', 'Últimos 30 días'],
+  ['this_month', 'Este mes'], ['last_month', 'Mes pasado'], ['custom', 'Personalizado'],
+]
+function rangeOf(preset, custom, today) {
+  switch (preset) {
+    case 'today': return { since: today, until: today }
+    case 'yesterday': return { since: addDays(today, -1), until: addDays(today, -1) }
+    case '7d': return { since: addDays(today, -6), until: today }
+    case '30d': return { since: addDays(today, -29), until: today }
+    case 'this_month': return { since: monthStartOf(today), until: today, month: monthStartOf(today) }
+    case 'last_month': { const m = monthStartOf(addDays(monthStartOf(today), -1)); return { since: m, until: monthEndOf(m), month: m } }
+    case 'custom': return custom.since && custom.until ? { since: custom.since, until: custom.until } : null
+    default: return null
+  }
+}
+
+async function fetchAll(build) {
+  const out = []
+  for (let from = 0; ; from += 1000) {
+    const page = await q(build().range(from, from + 999))
+    out.push(...page)
+    if (page.length < 1000) return out
+  }
+}
+
+// Agrega filas diarias por anuncio y les pega los datos del anuncio (nombre, campaña, estado)
+function aggregateDaily(daily, adsById) {
+  const by = {}
+  for (const d of daily) {
+    const r = (by[d.ad_id] ||= { spend: 0, messages: 0, impressions: 0, clicks: 0 })
+    r.spend += Number(d.spend); r.messages += d.messages; r.impressions += Number(d.impressions); r.clicks += d.clicks
+  }
+  return Object.entries(by).filter(([id]) => adsById[id]).map(([id, r]) => ({
+    ...adsById[id], ...r, thruplays: null, ctr: r.impressions ? (r.clicks / r.impressions) * 100 : null,
+  }))
+}
+
+// Publicidad: inversión en Meta Ads por cliente, seguimiento del mes y anuncios ganadores
 export default function Ads() {
   const { adsClients: clients, clientId: lastClientId, setClientId } = useStudio()
   const clientId = clients.some(c => c.id === lastClientId) ? lastClientId : clients[0]?.id || ''
+  const today = iso(new Date())
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [brand, setBrand] = useState('all')
+  const [accountFilter, setAccountFilter] = useState('all')
+  const [preset, setPreset] = useState('this_month')
+  const [custom, setCustom] = useState({ since: monthStartOf(today), until: today })
   const [sortBy, setSortBy] = useState('messages')
   const [objective, setObjective] = useState('mensajes')
 
@@ -35,12 +85,13 @@ export default function Ads() {
       try {
         const accounts = await q(supabase.from('ad_accounts').select('*').eq('client_id', clientId).order('name'))
         const ids = accounts.map(a => a.id)
-        const [monthly, ads, log] = await Promise.all([
+        const [monthly, ads, daily, log] = await Promise.all([
           ids.length ? q(supabase.from('ad_monthly').select('*').in('account_id', ids).order('month')) : [],
           ids.length ? q(supabase.from('ad_ads').select('*').in('account_id', ids)) : [],
+          ids.length ? fetchAll(() => supabase.from('ad_daily').select('*').in('account_id', ids).order('date')) : [],
           q(supabase.from('ad_ops_log').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30)),
         ])
-        if (alive) { setData({ accounts, monthly, ads, log }); setError(null) }
+        if (alive) { setData({ accounts, monthly, ads, daily, log }); setError(null) }
       } catch (e) {
         if (alive) setError(e.message)
       }
@@ -48,63 +99,76 @@ export default function Ads() {
     return () => { alive = false }
   }, [clientId])
 
+  const range = rangeOf(preset, custom, today)
+
   const view = useMemo(() => {
     if (!data) return null
-    const accounts = data.accounts.filter(a => brand === 'all' || a.brand === brand)
+    const accounts = data.accounts.filter(a => (brand === 'all' || a.brand === brand) && (accountFilter === 'all' || a.id === accountFilter))
     const accById = Object.fromEntries(accounts.map(a => [a.id, a]))
     const monthly = data.monthly.filter(m => accById[m.account_id])
-    const ads = data.ads.filter(a => accById[a.account_id])
+    const allAds = data.ads.filter(a => accById[a.account_id])
+    const adsById = Object.fromEntries(allAds.map(a => [a.id, a]))
+    const daily = data.daily.filter(d => accById[d.account_id])
+    const hasDaily = a => !!a.daily_since
 
-    const spend = ads.reduce((s, a) => s + Number(a.spend), 0)
-    const messages = ads.reduce((s, a) => s + a.messages, 0)
-    const msgSpend = ads.filter(a => a.objective === 'mensajes').reduce((s, a) => s + Number(a.spend), 0)
-    const msgMessages = ads.filter(a => a.objective === 'mensajes').reduce((s, a) => s + a.messages, 0)
+    // Cuentas sin detalle diario: en meses completos se usa su total mensual; en otros rangos no se pueden incluir
+    let ads, fallback = {}, missing = []
+    if (!range) {
+      ads = allAds.map(a => ({ ...a, spend: Number(a.spend), impressions: Number(a.impressions), ctr: a.ctr == null ? null : Number(a.ctr) }))
+    } else {
+      ads = aggregateDaily(daily.filter(d => d.date >= range.since && d.date <= range.until), adsById)
+      for (const a of accounts.filter(a => a.sync_status === 'ok' && !hasDaily(a))) {
+        // Con desglose mensual cargado, un mes sin fila significa que no hubo gasto
+        const hasMonthly = monthly.some(x => x.account_id === a.id)
+        const m = range.month && monthly.find(x => x.account_id === a.id && x.month === range.month)
+        if (range.month && hasMonthly) fallback[a.id] = { spend: Number(m?.spend || 0), messages: m?.messages || 0 }
+        else missing.push(a)
+      }
+    }
+    const fbSpend = Object.values(fallback).reduce((s, f) => s + f.spend, 0)
+    const fbMsgs = Object.values(fallback).reduce((s, f) => s + f.messages, 0)
+
+    const spend = sumBy(ads, 'spend') + fbSpend
+    const messages = sumBy(ads, 'messages') + fbMsgs
+    const msgAds = ads.filter(a => a.objective === 'mensajes')
+    const msgSpend = sumBy(msgAds, 'spend') + fbSpend
+    const msgMessages = sumBy(msgAds, 'messages') + fbMsgs
 
     const byMonth = {}
     for (const m of monthly) {
-      const r = (byMonth[m.month] ||= { month: m.month, spend: 0, messages: 0 })
-      r.spend += Number(m.spend)
-      r.messages += m.messages
+      const r = (byMonth[m.month] ||= { key: m.month, label: monthName(m.month), spend: 0, messages: 0 })
+      r.spend += Number(m.spend); r.messages += m.messages
     }
-    const months = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month))
+    const months = Object.values(byMonth).sort((a, b) => a.key.localeCompare(b.key))
 
-    const perAccount = accounts.map(a => {
-      const rows = ads.filter(x => x.account_id === a.id)
-      return { ...a, spend: rows.reduce((s, x) => s + Number(x.spend), 0), messages: rows.reduce((s, x) => s + x.messages, 0), active: rows.filter(x => x.status === 'ACTIVE').length }
-    })
+    const perAccount = accounts.map(a => ({
+      ...a, noDaily: !!range && !hasDaily(a), fallback: fallback[a.id],
+    }))
 
     const sorted = ads
       .filter(a => objective === 'all' || a.objective === objective)
-      .map(a => ({ ...a, spend: Number(a.spend), cost: cpm(Number(a.spend), a.messages), account: accById[a.account_id] }))
+      .map(a => ({ ...a, cost: cpm(a.spend, a.messages), account: accById[a.account_id] }))
       .sort((a, b) => sortBy === 'cost'
         ? (a.messages >= 20 ? a.cost : Infinity) - (b.messages >= 20 ? b.cost : Infinity)
         : b[sortBy] - a[sortBy])
 
-    // Gasto en anuncios activos que no traen conversaciones (alerta para el admin y el cliente)
-    const leaks = ads.filter(a => a.status === 'ACTIVE' && a.objective !== 'mensajes' && Number(a.spend) > 50000)
+    const leaks = ads.filter(a => a.status === 'ACTIVE' && a.objective !== 'mensajes' && a.spend > 50000)
+    const top = [...ads].sort((a, b) => b.messages - a.messages)[0]
 
-    const withMonths = new Set(monthly.map(m => m.account_id))
-    const noMonthly = perAccount.filter(a => a.sync_status === 'ok' && a.spend > 0 && !withMonths.has(a.id))
-
-    return { accounts: perAccount, months, noMonthly, ads: sorted, spend, messages, msgSpend, msgMessages, leaks, top: [...ads].sort((a, b) => b.messages - a.messages)[0] }
-  }, [data, brand, sortBy, objective])
+    return { accounts: perAccount, monthly, months, daily, allAds, adsById, ads, sorted, spend, messages, msgSpend, msgMessages, leaks, top, missing, hasFallback: fbSpend > 0 }
+  }, [data, brand, accountFilter, sortBy, objective, range?.since, range?.until, range?.month])
 
   const brands = useMemo(() => [...new Set((data?.accounts || []).map(a => a.brand).filter(Boolean))], [data])
   const pending = view?.accounts.filter(a => a.sync_status !== 'ok') || []
   const lastSync = data?.accounts.map(a => a.synced_at).filter(Boolean).sort().at(-1)
+  const periodLabel = !range ? 'desde el inicio' : range.since === range.until ? dayName(range.since) : `${dayName(range.since)} al ${dayName(range.until)}`
 
   return (
     <div>
       <PageHeader title="Publicidad" subtitle={lastSync ? `Meta Ads · actualizado ${new Date(lastSync).toLocaleDateString('es-CL')}` : 'Meta Ads'}>
         {clients.length > 1 && (
-          <Select value={clientId} onChange={e => setClientId(e.target.value)} className="w-auto!">
+          <Select value={clientId} onChange={e => { setClientId(e.target.value); setAccountFilter('all') }} className="w-auto!">
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-        )}
-        {brands.length > 1 && (
-          <Select value={brand} onChange={e => setBrand(e.target.value)} className="w-auto!">
-            <option value="all">Todas las marcas</option>
-            {brands.map(b => <option key={b} value={b}>{b}</option>)}
           </Select>
         )}
       </PageHeader>
@@ -113,6 +177,40 @@ export default function Ads() {
         <Card className="p-6 text-sm text-foreground-muted">Este cliente todavía no tiene cuentas publicitarias conectadas.</Card>
       ) : (
         <div className="space-y-4">
+          <Card className="flex flex-wrap items-end gap-2 p-3">
+            <label className="min-w-40 flex-1 sm:flex-none">
+              <span className="mb-1 block text-[11px] text-foreground-muted">Período</span>
+              <Select value={preset} onChange={e => setPreset(e.target.value)} className="h-9">
+                {PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </Select>
+            </label>
+            {preset === 'custom' && (
+              <>
+                <label><span className="mb-1 block text-[11px] text-foreground-muted">Desde</span>
+                  <Input type="date" value={custom.since} max={custom.until || today} onChange={e => setCustom(c => ({ ...c, since: e.target.value }))} className="h-9" /></label>
+                <label><span className="mb-1 block text-[11px] text-foreground-muted">Hasta</span>
+                  <Input type="date" value={custom.until} min={custom.since} max={today} onChange={e => setCustom(c => ({ ...c, until: e.target.value }))} className="h-9" /></label>
+              </>
+            )}
+            {brands.length > 1 && (
+              <label className="min-w-40 flex-1 sm:flex-none">
+                <span className="mb-1 block text-[11px] text-foreground-muted">Marca</span>
+                <Select value={brand} onChange={e => { setBrand(e.target.value); setAccountFilter('all') }} className="h-9">
+                  <option value="all">Todas las marcas</option>
+                  {brands.map(b => <option key={b} value={b}>{b}</option>)}
+                </Select>
+              </label>
+            )}
+            <label className="min-w-48 flex-1 sm:flex-none">
+              <span className="mb-1 block text-[11px] text-foreground-muted">Cuenta</span>
+              <Select value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className="h-9">
+                <option value="all">Todas las cuentas</option>
+                {data.accounts.filter(a => brand === 'all' || a.brand === brand).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </Select>
+            </label>
+            <span className="ml-auto flex items-center gap-1.5 self-center text-xs text-foreground-muted"><CalendarRange size={14} /> {periodLabel}</span>
+          </Card>
+
           {pending.length > 0 && (
             <Card className="border-amber/40 p-4 text-sm">
               <p className="flex items-center gap-2 font-medium"><AlertTriangle size={15} className="text-amber" /> Los totales no incluyen {pending.length === 1 ? 'una cuenta' : `${pending.length} cuentas`}</p>
@@ -121,39 +219,41 @@ export default function Ads() {
               </ul>
             </Card>
           )}
+          {view.missing.length > 0 && (
+            <Card className="border-amber/40 p-3 text-sm text-foreground-muted">
+              <AlertTriangle size={14} className="mr-1.5 inline text-amber" />
+              Para este período no se incluye {view.missing.map(a => a.name).join(', ')}: todavía no tenemos su detalle por día (sí por mes; elige "Este mes" o "Mes pasado" para verlas).
+            </Card>
+          )}
+
+          <MonthToDate monthly={view.monthly} daily={view.daily} accounts={view.accounts} today={today} />
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Inversión acumulada" value={clp(view.spend)} sub="cuentas sincronizadas" />
+            <Stat label="Inversión" value={clp(view.spend)} sub={periodLabel} />
             <Stat label="Conversaciones de WhatsApp" value={num(view.messages)} sub="iniciadas desde anuncios" />
             <Stat label="Costo por conversación" value={clp(cpm(view.msgSpend, view.msgMessages))} sub="solo campañas de mensajes" />
-            <Stat label="Mejor video" value={view.top?.name || '—'} sub={view.top ? `${num(view.top.messages)} conversaciones` : ''} small />
+            <Stat label="Video con más conversaciones" value={view.top?.name || '—'} sub={view.top ? `${num(view.top.messages)} conversaciones · ${periodLabel}` : periodLabel} small />
           </div>
 
           {view.leaks.length > 0 && (
             <Card className="border-red/40 p-4 text-sm">
               <p className="flex items-center gap-2 font-medium"><AlertTriangle size={15} className="text-red" /> Anuncios activos que gastan sin traer conversaciones</p>
               <p className="mt-1 text-foreground-muted">
-                {view.leaks.length === 1 ? '1 anuncio de tráfico activo acumula' : `${view.leaks.length} anuncios de tráfico activos acumulan`} {clp(view.leaks.reduce((s, a) => s + Number(a.spend), 0))} con{' '}
-                {num(view.leaks.reduce((s, a) => s + a.messages, 0))} conversaciones. Conviene pasarlos a campaña de mensajes o pausarlos.
+                {view.leaks.length === 1 ? '1 anuncio de tráfico activo acumula' : `${view.leaks.length} anuncios de tráfico activos acumulan`} {clp(sumBy(view.leaks, 'spend'))} con{' '}
+                {num(sumBy(view.leaks, 'messages'))} conversaciones. Conviene pasarlos a campaña de mensajes o pausarlos.
               </p>
             </Card>
           )}
 
-          <Card className="p-4">
-            <h2 className="mb-3 text-sm font-semibold">Inversión y conversaciones por mes</h2>
-            <MonthChart months={view.months} />
-            {view.noMonthly.length > 0 && (
-              <p className="mt-2 text-xs text-foreground-subtle">
-                No incluye {view.noMonthly.map(a => a.name).join(', ')} ({clp(view.noMonthly.reduce((s, a) => s + a.spend, 0))}): falta su desglose mensual.
-              </p>
-            )}
-          </Card>
+          <Winners allAds={view.allAds} adsById={view.adsById} daily={view.daily} accounts={view.accounts} today={today} />
 
-          <Explorer accounts={view.accounts} ads={data.ads.filter(a => view.accounts.some(x => x.id === a.account_id))} />
+          <Trend months={view.months} daily={view.daily} range={range} today={today} accounts={view.accounts} />
+
+          <Explorer accounts={view.accounts} ads={view.ads} rangeMode={!!range} />
 
           <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Ranking de videos · todas las cuentas</h2>
+              <h2 className="text-sm font-semibold">Ranking de videos · {periodLabel}</h2>
               <div className="flex gap-2">
                 <Select value={objective} onChange={e => setObjective(e.target.value)} className="h-8! w-auto! text-xs!">
                   <option value="mensajes">Campañas de WhatsApp</option>
@@ -167,7 +267,7 @@ export default function Ads() {
                 </Select>
               </div>
             </div>
-            <AdsTable ads={view.ads} totalSpend={view.spend} />
+            <AdsTable ads={view.sorted} totalSpend={sumBy(view.ads, 'spend')} />
           </Card>
 
           <FunnelPreview messages={view.messages} />
@@ -176,6 +276,184 @@ export default function Ads() {
         </div>
       )}
     </div>
+  )
+}
+
+// ── Mes en curso: cuánto llevamos, ritmo diario y proyección al cierre ──
+function MonthToDate({ monthly, daily, accounts, today }) {
+  const m = monthStartOf(today)
+  const prev = monthStartOf(addDays(m, -1))
+  const ids = new Set(accounts.filter(a => a.sync_status === 'ok').map(a => a.id))
+  // Por cuenta: lo más actualizado entre el total mensual cargado y la suma de sus días
+  const monthTotal = month => {
+    let spend = 0, messages = 0
+    for (const id of ids) {
+      const mm = monthly.find(x => x.account_id === id && x.month === month)
+      const dd = daily.filter(d => d.account_id === id && d.date.startsWith(month.slice(0, 7)))
+      const ds = sumBy(dd, 'spend'), dm = sumBy(dd, 'messages')
+      const useDaily = ds >= Number(mm?.spend || 0)
+      spend += useDaily ? ds : Number(mm.spend); messages += useDaily ? dm : mm.messages
+    }
+    return { spend, messages }
+  }
+  const cur = monthTotal(m), last = monthTotal(prev)
+  const elapsed = Number(today.slice(8, 10))
+  const daysInMonth = Number(monthEndOf(today).slice(8, 10))
+  const pace = cur.spend / elapsed
+  const projection = pace * daysInMonth
+  const lastSamePace = last.spend ? (projection / last.spend - 1) * 100 : null
+  return (
+    <Card className="p-4">
+      <h2 className="text-sm font-semibold">Mes en curso · <span className="capitalize">{new Date(`${m}T12:00:00`).toLocaleDateString('es-CL', { month: 'long' })}</span> {m.slice(0, 4)}</h2>
+      <p className="mb-3 text-xs text-foreground-muted">Día {elapsed} de {daysInMonth}. La proyección asume el mismo ritmo de gasto hasta fin de mes.</p>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Mini label="Llevamos invertido" value={clp(cur.spend)} />
+        <Mini label="Conversaciones" value={num(cur.messages)} sub={`${clp(cpm(cur.spend, cur.messages))} c/u`} />
+        <Mini label="Gasto promedio diario" value={clp(pace)} />
+        <Mini label="Proyección al cierre" value={clp(projection)} />
+        <Mini label={`Mes anterior (${monthName(prev)})`} value={clp(last.spend)}
+          sub={lastSamePace == null ? '' : `${lastSamePace >= 0 ? '+' : ''}${lastSamePace.toFixed(0)}% proyectado vs anterior`} />
+      </div>
+    </Card>
+  )
+}
+
+function Mini({ label, value, sub }) {
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <p className="text-[11px] text-foreground-muted">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums">{value}</p>
+      {sub && <p className="text-[11px] text-foreground-subtle">{sub}</p>}
+    </div>
+  )
+}
+
+// ── Tendencia por día, semana o mes ──
+function Trend({ months, daily, range, today, accounts }) {
+  const [gran, setGran] = useState('week')
+  const since = range?.since || (gran === 'day' ? addDays(today, -29) : addDays(today, -7 * 12 + 1))
+  const until = range?.until || today
+  let buckets
+  if (gran === 'month') buckets = months
+  else {
+    const by = {}
+    for (const d of daily.filter(d => d.date >= since && d.date <= until)) {
+      const k = gran === 'day' ? d.date : weekStartOf(d.date)
+      const r = (by[k] ||= { key: k, label: gran === 'day' ? dayName(k) : `Sem. ${dayName(k)}`, spend: 0, messages: 0 })
+      r.spend += Number(d.spend); r.messages += d.messages
+    }
+    buckets = Object.values(by).sort((a, b) => a.key.localeCompare(b.key))
+  }
+  const noDaily = accounts.filter(a => a.sync_status === 'ok' && !a.daily_since)
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Inversión y conversaciones por {gran === 'day' ? 'día' : gran === 'week' ? 'semana' : 'mes'}</h2>
+        <div className="flex rounded-lg border border-border p-0.5 text-xs">
+          {[['day', 'Día'], ['week', 'Semana'], ['month', 'Mes']].map(([k, l]) => (
+            <button key={k} onClick={() => setGran(k)} className={cx('rounded-md px-3 py-1', gran === k ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground')}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <BarChart rows={buckets} compact={buckets.length > 14} />
+      {gran !== 'month' && noDaily.length > 0 && (
+        <p className="mt-2 text-xs text-foreground-subtle">Por día y semana no incluye {noDaily.map(a => a.name).join(', ')} (falta su detalle diario). La vista por mes sí las incluye.</p>
+      )}
+    </Card>
+  )
+}
+
+function BarChart({ rows, compact }) {
+  if (!rows.length) return <p className="text-sm text-foreground-muted">Sin datos para este período.</p>
+  const max = Math.max(...rows.map(m => m.spend), 1)
+  return (
+    <div className="flex items-end gap-1.5 overflow-x-auto pb-1">
+      {rows.map(m => (
+        <div key={m.key} className={cx('flex flex-1 flex-col items-center gap-1', compact ? 'min-w-9' : 'min-w-16')} title={`${m.label}: ${clp(m.spend)} · ${num(m.messages)} conv.`}>
+          {!compact && <span className="text-[11px] tabular-nums text-foreground-muted">{m.spend >= 1e6 ? `$${(m.spend / 1e6).toFixed(1)}M` : `$${Math.round(m.spend / 1e3)}K`}</span>}
+          <div className="flex h-36 w-full items-end">
+            <div className="w-full rounded-t-md bg-accent" style={{ height: `${Math.max(2, (m.spend / max) * 100)}%` }} />
+          </div>
+          <span className={cx('whitespace-nowrap font-medium capitalize', compact ? 'text-[10px]' : 'text-xs')}>{m.label}</span>
+          {!compact && <span className="text-[11px] tabular-nums text-foreground-subtle">{num(m.messages)} conv.</span>}
+          {!compact && <span className="text-[11px] tabular-nums text-foreground-subtle">{clp(cpm(m.spend, m.messages))}</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Anuncios ganadores: en cada campaña, qué anuncio se está llevando el presupuesto ──
+const WIN_PERIODS = [['today', 'Hoy'], ['yesterday', 'Ayer'], ['7d', 'Últimos 7 días'], ['this_month', 'Este mes']]
+function Winners({ allAds, adsById, daily, accounts, today }) {
+  const [period, setPeriod] = useState('7d')
+  const r = rangeOf(period, {}, today)
+  const rows = aggregateDaily(daily.filter(d => d.date >= r.since && d.date <= r.until), adsById).filter(a => a.spend > 0)
+  const groups = {}
+  for (const a of rows) (groups[`${a.account_id}|${a.campaign_name}`] ||= []).push(a)
+  // Cuentas sin detalle diario: se muestra el acumulado de sus anuncios activos
+  const noDaily = accounts.filter(a => a.sync_status === 'ok' && !a.daily_since).map(a => a.id)
+  const cumulative = {}
+  for (const a of allAds.filter(a => noDaily.includes(a.account_id) && a.status === 'ACTIVE')) {
+    (cumulative[`${a.account_id}|${a.campaign_name}`] ||= []).push({ ...a, spend: Number(a.spend) })
+  }
+  const accName = Object.fromEntries(accounts.map(a => [a.id, a.name]))
+  const render = (key, list, cumul) => {
+    const total = sumBy(list, 'spend')
+    const sorted = [...list].sort((a, b) => b.spend - a.spend)
+    const eligible = sorted.filter(a => a.messages >= 3)
+    const best = eligible.length > 1 ? eligible.reduce((x, y) => (cpm(y.spend, y.messages) < cpm(x.spend, x.messages) ? y : x)) : null
+    const [accId, ...rest] = key.split('|')
+    const campaign = rest.join('|')
+    return (
+      <div key={key} className="rounded-lg border border-border p-3">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-1">
+          <p className="text-sm font-medium">{campaign}</p>
+          <p className="text-[11px] text-foreground-subtle">{accName[accId]} · {clp(total)} {cumul ? 'acumulado (sin detalle diario)' : 'en el período'}</p>
+        </div>
+        <ul className="space-y-2.5">
+          {sorted.slice(0, 5).map((a, i) => {
+            const share = total ? (a.spend / total) * 100 : 0
+            return (
+              <li key={a.id} className="text-sm">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="flex min-w-0 max-w-full items-center gap-1.5">
+                    {i === 0 && <Trophy size={14} className="shrink-0 text-amber" />}
+                    <span className="min-w-0 truncate">{a.name}</span>
+                  </span>
+                  {i === 0 && <Badge color="#F59E0B">Ganador</Badge>}
+                  {best?.id === a.id && <Badge color="#22C55E">Mejor costo</Badge>}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span className="flex min-w-32 flex-1 items-center gap-2">
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface"><span className="block h-full rounded-full bg-accent" style={{ width: `${share}%` }} /></span>
+                    <span className="whitespace-nowrap text-right text-xs tabular-nums text-foreground-muted">{share.toFixed(0)}% ppto.</span>
+                  </span>
+                  <span className="text-xs tabular-nums text-foreground-muted">{clp(a.spend)} · {num(a.messages)} conv. · {clp(cpm(a.spend, a.messages))} c/u</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }
+  const keys = Object.keys(groups).sort((a, b) => sumBy(groups[b], 'spend') - sumBy(groups[a], 'spend'))
+  return (
+    <Card className="p-4">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><Trophy size={15} className="text-amber" /> Anuncios ganadores</h2>
+        <Select value={period} onChange={e => setPeriod(e.target.value)} className="h-8! w-auto! text-xs!">
+          {WIN_PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </Select>
+      </div>
+      <p className="mb-3 text-xs text-foreground-muted">En cada campaña, Meta reparte el presupuesto entre los anuncios. El <b>ganador</b> es el que se está llevando la mayor parte; <b>mejor costo</b> es el que trae conversaciones más baratas.</p>
+      <div className="space-y-3">
+        {keys.map(k => render(k, groups[k], false))}
+        {Object.entries(cumulative).map(([k, list]) => render(k, list, true))}
+        {keys.length === 0 && Object.keys(cumulative).length === 0 && <p className="text-sm text-foreground-muted">Ninguna campaña gastó en este período.</p>}
+      </div>
+    </Card>
   )
 }
 
@@ -191,11 +469,14 @@ const agg = rows => {
 }
 
 // Explorador jerárquico: Cuenta → Campaña → Anuncios (agrupados por conjunto)
-function Explorer({ accounts, ads }) {
+function Explorer({ accounts, ads, rangeMode }) {
   const [accountId, setAccountId] = useState(null)
   const [campaign, setCampaign] = useState(null)
   const [sort, setSort] = useState({ key: 'spend', dir: -1 })
-  const total = sumBy(ads, 'spend')
+  // Cuentas sin detalle diario aportan su total mensual solo a nivel de cuenta
+  const fbSpend = accounts.reduce((s, a) => s + (a.noDaily && a.fallback ? a.fallback.spend : 0), 0)
+  const fbMsgs = accounts.reduce((s, a) => s + (a.noDaily && a.fallback ? a.fallback.messages : 0), 0)
+  const total = sumBy(ads, 'spend') + fbSpend
   const account = accounts.find(a => a.id === accountId)
 
   const level = !account ? 'account' : !campaign ? 'campaign' : 'ad'
@@ -203,7 +484,13 @@ function Explorer({ accounts, ads }) {
   if (level === 'account') {
     rows = accounts.map(a => {
       const r = ads.filter(x => x.account_id === a.id)
-      return { key: a.id, name: a.name, sub: `${a.brand} · ${a.id}`, badge: SYNC[a.sync_status], ok: a.sync_status === 'ok' && r.length > 0,
+      const sub = `${a.brand} · ${a.id}`
+      if (a.noDaily && a.sync_status === 'ok') {
+        const f = a.fallback
+        return { key: a.id, name: a.name, sub, badge: { label: f ? 'Total del mes' : 'Sin detalle diario', color: '#F59E0B' }, ok: false, campaigns: null,
+          ...(f ? { spend: f.spend, messages: f.messages, cost: cpm(f.spend, f.messages), adsCount: 1, impressions: null, ctr: null } : { adsCount: 0 }) }
+      }
+      return { key: a.id, name: a.name, sub, badge: SYNC[a.sync_status], ok: a.sync_status === 'ok' && r.length > 0,
         campaigns: new Set(r.map(x => x.campaign_name)).size, ...agg(r) }
     })
   } else if (level === 'campaign') {
@@ -229,6 +516,9 @@ function Explorer({ accounts, ads }) {
   })
   const levelTotal = agg(level === 'account' ? ads : level === 'campaign' ? ads.filter(x => x.account_id === account.id)
     : ads.filter(x => x.account_id === account.id && (x.campaign_name || 'Sin campaña') === campaign))
+  if (level === 'account' && fbSpend) {
+    levelTotal.spend += fbSpend; levelTotal.messages += fbMsgs; levelTotal.cost = cpm(levelTotal.spend, levelTotal.messages)
+  }
 
   const open = r => {
     if (!r.ok) return
@@ -258,7 +548,7 @@ function Explorer({ accounts, ads }) {
               {level !== 'ad' && <Th k="activeAds">Anuncios activos</Th>}
               <Th k="spend">Inversión</Th><th className="py-1.5 text-right font-medium">% del total</th>
               <Th k="impressions">Impresiones</Th><Th k="ctr">CTR</Th>
-              {level === 'ad' && <Th k="thruplays">ThruPlays</Th>}
+              {level === 'ad' && !rangeMode && <Th k="thruplays">ThruPlays</Th>}
               <Th k="messages">Conversaciones</Th><Th k="cost">Costo/conv.</Th>
             </tr>
           </thead>
@@ -279,7 +569,7 @@ function Explorer({ accounts, ads }) {
                 <td className="text-right tabular-nums text-foreground-muted">{total && r.spend ? `${((r.spend / total) * 100).toFixed(1)}%` : '—'}</td>
                 <td className="text-right tabular-nums">{r.adsCount === 0 ? '—' : num(r.impressions)}</td>
                 <td className="text-right tabular-nums">{r.ctr == null ? '—' : `${r.ctr.toFixed(2)}%`}</td>
-                {level === 'ad' && <td className="text-right tabular-nums">{num(r.thruplays)}</td>}
+                {level === 'ad' && !rangeMode && <td className="text-right tabular-nums">{num(r.thruplays)}</td>}
                 <td className="text-right tabular-nums">{r.adsCount === 0 ? '—' : num(r.messages)}</td>
                 <td className={cx('text-right tabular-nums', r.cost > 10000 && 'text-red')}>{clp(r.cost)}</td>
               </tr>
@@ -294,7 +584,7 @@ function Explorer({ accounts, ads }) {
               <td className="text-right tabular-nums text-foreground-muted">{total ? `${((levelTotal.spend / total) * 100).toFixed(1)}%` : '—'}</td>
               <td className="text-right tabular-nums">{num(levelTotal.impressions)}</td>
               <td className="text-right tabular-nums">{levelTotal.ctr == null ? '—' : `${levelTotal.ctr.toFixed(2)}%`}</td>
-              {level === 'ad' && <td className="text-right tabular-nums">{num(levelTotal.thruplays)}</td>}
+              {level === 'ad' && !rangeMode && <td className="text-right tabular-nums">{num(levelTotal.thruplays)}</td>}
               <td className="text-right tabular-nums">{num(levelTotal.messages)}</td>
               <td className="text-right tabular-nums">{clp(levelTotal.cost)}</td>
             </tr>
@@ -303,26 +593,6 @@ function Explorer({ accounts, ads }) {
       </div>
       {level === 'account' && <p className="mt-2 text-xs text-foreground-subtle">Haz clic en una cuenta para ver sus campañas, y en una campaña para ver sus anuncios.</p>}
     </Card>
-  )
-}
-
-function MonthChart({ months }) {
-  if (!months.length) return <p className="text-sm text-foreground-muted">Sin datos mensuales.</p>
-  const max = Math.max(...months.map(m => m.spend), 1)
-  return (
-    <div className="flex items-end gap-2 overflow-x-auto pb-1">
-      {months.map(m => (
-        <div key={m.month} className="flex min-w-16 flex-1 flex-col items-center gap-1">
-          <span className="text-[11px] tabular-nums text-foreground-muted">{m.spend ? `$${(m.spend / 1e6).toFixed(1)}M` : '$0'}</span>
-          <div className="flex h-40 w-full items-end">
-            <div className="w-full rounded-t-md bg-accent" style={{ height: `${Math.max(2, (m.spend / max) * 100)}%` }} title={clp(m.spend)} />
-          </div>
-          <span className="text-xs font-medium capitalize">{monthName(m.month)}</span>
-          <span className="text-[11px] tabular-nums text-foreground-subtle">{num(m.messages)} conv.</span>
-          <span className="text-[11px] tabular-nums text-foreground-subtle">{clp(cpm(m.spend, m.messages))}</span>
-        </div>
-      ))}
-    </div>
   )
 }
 

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { adminApi } from '../lib/api'
 import { LogoMark } from '../../components/Logo'
 import { Button, Input, Field, ErrorNote, Card } from '../components/ui'
+import { toLoginEmail } from '../lib/constants'
 
 export default function Login() {
   const [mode, setMode] = useState('login')
@@ -21,8 +22,8 @@ export default function Login() {
         // Primer ingreso: crea la cuenta admin (solo funciona si aún no hay admins)
         await adminApi('bootstrap', { email, password, full_name: fullName })
       }
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : error.message)
+      const { error } = await supabase.auth.signInWithPassword({ email: toLoginEmail(email), password })
+      if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Usuario o contraseña incorrectos' : error.message)
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -36,14 +37,14 @@ export default function Login() {
           <LogoMark size={36} />
           <div>
             <p className="font-semibold">Quantro Studio</p>
-            <p className="text-xs text-foreground-muted">Producción de contenido</p>
+            <p className="text-xs text-foreground-muted">Portal de clientes</p>
           </div>
         </div>
         <form onSubmit={submit} className="space-y-3">
           {mode === 'setup' && (
             <Field label="Tu nombre"><Input value={fullName} onChange={e => setFullName(e.target.value)} required /></Field>
           )}
-          <Field label="Email"><Input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required /></Field>
+          <Field label={mode === 'setup' ? 'Email' : 'Email o usuario'}><Input type={mode === 'setup' ? 'email' : 'text'} autoComplete="username" autoCapitalize="none" value={email} onChange={e => setEmail(e.target.value)} required /></Field>
           <Field label="Contraseña">
             <Input type="password" autoComplete={mode === 'setup' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} minLength={mode === 'setup' ? 8 : undefined} required />
           </Field>

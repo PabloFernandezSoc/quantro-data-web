@@ -73,9 +73,14 @@ Supabase MCP, proyecto **Quantrodataweb** (`project_id: mcgogmldiuejqrqfgwbd`).
    - `on conflict (id) do update set ... , synced_at = now()`.
 2. **Por mes** a nivel de cuenta → upsert en `ad_monthly (account_id, month, spend, messages)`, con `month` = primer día del mes. En CSV: desglose por tiempo → Mes.
    - Las cuentas 1577892457195625 y 27943147608624246 todavía no tienen datos mensuales: cárgalos en la primera sincronización.
-3. Actualiza `ad_accounts`: `sync_status = 'ok'`, `synced_at = now()` y `sync_note` (null si está todo completo).
-4. Verifica que la suma de `ad_ads.spend` por cuenta cuadre con el total de Meta en período Máximo. Si no cuadra, faltan anuncios archivados.
-5. Registra en la bitácora un `sync` con el resumen: gasto y conversaciones de la semana, comparación con la semana anterior y el mejor y peor video.
+3. **Por día y anuncio** → upsert en `ad_daily (ad_id, account_id, date, spend, messages, impressions, clicks)`, solo filas con gasto o conversaciones. Alimenta los filtros de fecha, la vista por semana y los **anuncios ganadores**.
+   - En Ads Manager: nivel Anuncios → Desglose → Por tiempo → **Día**; columnas gasto, impresiones, clics (todos), conversaciones con mensajes iniciadas. Exporta CSV.
+   - Primera vez para 1577892457195625 y 27943147608624246: desde el inicio de cada cuenta. Después basta con los últimos 7 días (upsert).
+   - Al terminar: `update ad_accounts set daily_since = (select min(date) from ad_daily where account_id = '<ID>'), daily_until = current_date where id = '<ID>'`. Mientras `daily_since` sea null, la app muestra esa cuenta solo con totales mensuales.
+   - Por MCP (cuentas habilitadas): `ads_get_ad_entities` nivel ad, `time_increment: "1"`. El resultado es grande y se guarda en archivo: procésalo con un script y súbelo comprimido en lotes de ~350 filas.
+4. Actualiza `ad_accounts`: `sync_status = 'ok'`, `synced_at = now()` y `sync_note` (null si está todo completo).
+5. Verifica que la suma de `ad_ads.spend` por cuenta cuadre con el total de Meta en período Máximo. Si no cuadra, faltan anuncios archivados.
+6. Registra en la bitácora un `sync` con el resumen: gasto y conversaciones de la semana, comparación con la semana anterior y el mejor y peor video.
 
 ## Bitácora (`ad_ops_log`)
 
@@ -90,8 +95,9 @@ Para cerrar una propuesta: `update public.ad_ops_log set status = 'aplicada' whe
 
 ## Pendientes abiertos
 
-- [ ] **Campaña de tráfico en la cuenta 1371554021238141** ("Campaña manual de tráfico"): $1,94M y 14 conversaciones, activa. Ya está en la bitácora como propuesta de pausa, esperando OK de Pablo.
-- [ ] Cargar el desglose mensual de la cuenta principal y de Tus Pensiones.
+- [x] Campaña de tráfico de la cuenta 1371554021238141: pausada el 16-nov con OK de Pablo.
+- [ ] **Cargar `ad_daily` de la cuenta principal (1577892457195625) y de Tus Pensiones**: sin eso, el filtro por días y los anuncios ganadores de la cuenta principal usan solo totales acumulados.
+- [x] Desglose mensual de la cuenta principal y de Tus Pensiones (cargado).
 - [ ] Conectar Airtable para cerrar el embudo (reuniones, aptos, ventas) y calcular el costo por venta por video.
 - [ ] Volver a subir conversiones a Meta (Conversions API o carga manual de eventos offline, como en Buspei) para optimizar a leads de calidad.
 - [ ] Mensajes respaldo (943668171465617): regularizar el saldo impago.
