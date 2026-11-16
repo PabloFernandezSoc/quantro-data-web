@@ -388,7 +388,8 @@ const WIN_PERIODS = [['today', 'Hoy'], ['yesterday', 'Ayer'], ['7d', 'Últimos 7
 function Winners({ allAds, adsById, daily, accounts, today }) {
   const [period, setPeriod] = useState('7d')
   const r = rangeOf(period, {}, today)
-  const rows = aggregateDaily(daily.filter(d => d.date >= r.since && d.date <= r.until), adsById).filter(a => a.spend > 0)
+  // Solo lo que está corriendo hoy: anuncios activos (y por lo tanto en campañas activas)
+  const rows = aggregateDaily(daily.filter(d => d.date >= r.since && d.date <= r.until), adsById).filter(a => a.spend > 0 && a.status === 'ACTIVE')
   const groups = {}
   for (const a of rows) (groups[`${a.account_id}|${a.campaign_name}`] ||= []).push(a)
   // Cuentas sin detalle diario: se muestra el acumulado de sus anuncios activos
@@ -442,16 +443,16 @@ function Winners({ allAds, adsById, daily, accounts, today }) {
   return (
     <Card className="p-4">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><Trophy size={15} className="text-amber" /> Anuncios ganadores</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><Trophy size={15} className="text-amber" /> Anuncios ganadores · campañas activas</h2>
         <Select value={period} onChange={e => setPeriod(e.target.value)} className="h-8! w-auto! text-xs!">
           {WIN_PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </Select>
       </div>
-      <p className="mb-3 text-xs text-foreground-muted">En cada campaña, Meta reparte el presupuesto entre los anuncios. El <b>ganador</b> es el que se está llevando la mayor parte; <b>mejor costo</b> es el que trae conversaciones más baratas.</p>
+      <p className="mb-3 text-xs text-foreground-muted">Solo anuncios que están corriendo hoy. En cada campaña, Meta reparte el presupuesto entre los anuncios: el <b>ganador</b> es el que se está llevando la mayor parte y <b>mejor costo</b> el que trae conversaciones más baratas.</p>
       <div className="space-y-3">
         {keys.map(k => render(k, groups[k], false))}
         {Object.entries(cumulative).map(([k, list]) => render(k, list, true))}
-        {keys.length === 0 && Object.keys(cumulative).length === 0 && <p className="text-sm text-foreground-muted">Ninguna campaña gastó en este período.</p>}
+        {keys.length === 0 && Object.keys(cumulative).length === 0 && <p className="text-sm text-foreground-muted">No hay anuncios activos con gasto en este período.</p>}
       </div>
     </Card>
   )
