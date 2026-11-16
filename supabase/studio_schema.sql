@@ -481,3 +481,23 @@ create policy "ad_monthly_admin"  on public.ad_monthly for all to authenticated 
 create policy "ad_ads_select" on public.ad_ads for select to authenticated
   using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_client(a.client_id)));
 create policy "ad_ads_admin"  on public.ad_ads for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Bitácora de gestión de campañas (visible para el cliente en /app/publicidad)
+create table if not exists public.ad_ops_log (
+  id          uuid primary key default gen_random_uuid(),
+  client_id   uuid not null references public.clients (id) on delete cascade,
+  account_id  text references public.ad_accounts (id) on delete set null,
+  kind        text not null check (kind in ('sync', 'analisis', 'recomendacion', 'cambio', 'alerta')),
+  status      text not null default 'registrado' check (status in ('registrado', 'propuesta', 'aplicada', 'descartada')),
+  title       text not null,
+  detail      text,
+  entity      text,
+  before_value text,
+  after_value  text,
+  author      text not null default 'Claude',
+  created_at  timestamptz not null default now()
+);
+create index if not exists ad_ops_log_client_idx on public.ad_ops_log (client_id, created_at desc);
+alter table public.ad_ops_log enable row level security;
+create policy "ad_ops_log_select" on public.ad_ops_log for select to authenticated using (public.can_view_client(client_id));
+create policy "ad_ops_log_admin"  on public.ad_ops_log for all to authenticated using (public.is_admin()) with check (public.is_admin());

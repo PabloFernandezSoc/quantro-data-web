@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Lock, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, Lock, CheckCircle2, RefreshCw, Search, Lightbulb, Wrench, Bell } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q } from '../lib/api'
 import { useStudio } from '../lib/store'
@@ -16,7 +16,7 @@ const SYNC = {
   bloqueada: { label: 'Bloqueada', color: '#EF4444', icon: AlertTriangle },
 }
 const OBJECTIVE = { mensajes: 'WhatsApp', trafico: 'Tráfico', web: 'Web' }
-const STATUS_LABEL = { ACTIVE: 'Activo', PAUSED: 'Pausado', ARCHIVED: 'Archivado', CAMPAIGN_PAUSED: 'Campaña pausada', WITH_ISSUES: 'Con problemas' }
+const STATUS_LABEL = { ACTIVE: 'Activo', PAUSED: 'Pausado', ARCHIVED: 'Archivado', CAMPAIGN_PAUSED: 'Campaña pausada', ADSET_PAUSED: 'Conjunto pausado', WITH_ISSUES: 'Con problemas', NOT_DELIVERING: 'Sin entrega', INACTIVE: 'Inactivo', DELETED: 'Eliminado' }
 
 // Publicidad: inversión en Meta Ads por cliente y qué videos traen conversaciones
 export default function Ads() {
@@ -34,11 +34,12 @@ export default function Ads() {
       try {
         const accounts = await q(supabase.from('ad_accounts').select('*').eq('client_id', clientId).order('name'))
         const ids = accounts.map(a => a.id)
-        const [monthly, ads] = ids.length ? await Promise.all([
-          q(supabase.from('ad_monthly').select('*').in('account_id', ids).order('month')),
-          q(supabase.from('ad_ads').select('*').in('account_id', ids)),
-        ]) : [[], []]
-        if (alive) { setData({ accounts, monthly, ads }); setError(null) }
+        const [monthly, ads, log] = await Promise.all([
+          ids.length ? q(supabase.from('ad_monthly').select('*').in('account_id', ids).order('month')) : [],
+          ids.length ? q(supabase.from('ad_ads').select('*').in('account_id', ids)) : [],
+          q(supabase.from('ad_ops_log').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30)),
+        ])
+        if (alive) { setData({ accounts, monthly, ads, log }); setError(null) }
       } catch (e) {
         if (alive) setError(e.message)
       }
@@ -81,7 +82,10 @@ export default function Ads() {
     // Gasto en anuncios activos que no traen conversaciones (alerta para el admin y el cliente)
     const leaks = ads.filter(a => a.status === 'ACTIVE' && a.objective !== 'mensajes' && Number(a.spend) > 50000)
 
-    return { accounts: perAccount, months, ads: sorted, spend, messages, msgSpend, msgMessages, leaks, top: [...ads].sort((a, b) => b.messages - a.messages)[0] }
+    const withMonths = new Set(monthly.map(m => m.account_id))
+    const noMonthly = perAccount.filter(a => a.sync_status === 'ok' && a.spend > 0 && !withMonths.has(a.id))
+
+    return { accounts: perAccount, months, noMonthly, ads: sorted, spend, messages, msgSpend, msgMessages, leaks, top: [...ads].sort((a, b) => b.messages - a.messages)[0] }
   }, [data, brand, sortBy, objective])
 
   const brands = useMemo(() => [...new Set((data?.accounts || []).map(a => a.brand).filter(Boolean))], [data])
@@ -137,6 +141,11 @@ export default function Ads() {
           <Card className="p-4">
             <h2 className="mb-3 text-sm font-semibold">Inversión y conversaciones por mes</h2>
             <MonthChart months={view.months} />
+            {view.noMonthly.length > 0 && (
+              <p className="mt-2 text-xs text-foreground-subtle">
+                No incluye {view.noMonthly.map(a => a.name).join(', ')} ({clp(view.noMonthly.reduce((s, a) => s + a.spend, 0))}): falta su desglose mensual.
+              </p>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -184,6 +193,8 @@ export default function Ads() {
           </Card>
 
           <FunnelPreview messages={view.messages} />
+
+          <OpsLog log={data.log} accounts={data.accounts} />
         </div>
       )}
     </div>
@@ -272,6 +283,54 @@ function FunnelPreview({ messages }) {
           </div>
         ))}
       </div>
+    </Card>
+  )
+}
+
+const KIND = {
+  sync: { label: 'Actualización', icon: RefreshCw, color: '#8A8F98' },
+  analisis: { label: 'Análisis', icon: Search, color: '#6366F1' },
+  recomendacion: { label: 'Recomendación', icon: Lightbulb, color: '#F59E0B' },
+  cambio: { label: 'Cambio', icon: Wrench, color: '#22C55E' },
+  alerta: { label: 'Alerta', icon: Bell, color: '#EF4444' },
+}
+const LOG_STATUS = { propuesta: ['Esperando aprobación', '#F59E0B'], aplicada: ['Aplicada', '#22C55E'], descartada: ['Descartada', '#8A8F98'] }
+
+// Bitácora: lo que se analizó, propuso y cambió en las campañas
+function OpsLog({ log, accounts }) {
+  const accName = Object.fromEntries(accounts.map(a => [a.id, a.name]))
+  return (
+    <Card className="p-4">
+      <h2 className="text-sm font-semibold">Bitácora de gestión</h2>
+      <p className="mb-3 text-xs text-foreground-muted">Análisis, recomendaciones y cambios hechos en las campañas.</p>
+      {log.length === 0 ? <p className="text-sm text-foreground-muted">Sin registros todavía.</p> : (
+        <ul className="space-y-3">
+          {log.map(e => {
+            const k = KIND[e.kind] || KIND.analisis
+            const Icon = k.icon
+            const st = LOG_STATUS[e.status]
+            return (
+              <li key={e.id} className="flex gap-3 border-t border-border pt-3 first:border-0 first:pt-0">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: `${k.color}22`, color: k.color }}><Icon size={14} /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{e.title}</p>
+                    {st && <Badge color={st[1]}>{st[0]}</Badge>}
+                  </div>
+                  {e.detail && <p className="mt-0.5 text-sm text-foreground-muted">{e.detail}</p>}
+                  {(e.before_value || e.after_value) && (
+                    <p className="mt-0.5 text-xs text-foreground-muted">{e.before_value || '—'} → <span className="text-foreground">{e.after_value || '—'}</span></p>
+                  )}
+                  <p className="mt-1 text-[11px] text-foreground-subtle">
+                    {k.label} · {new Date(e.created_at).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {e.account_id && ` · ${accName[e.account_id] || e.account_id}`}{e.entity && ` · ${e.entity}`} · {e.author}
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </Card>
   )
 }
