@@ -67,7 +67,7 @@ Las 3 marcas "Tus Deudas" usan perfiles de IG equivalentes: existen como respald
 Supabase MCP, proyecto **Quantrodataweb** (`project_id: mcgogmldiuejqrqfgwbd`).
 
 1. **Por anuncio** (período Máximo, incluyendo archivados) → upsert en `ad_ads`.
-   Columnas: `id, account_id, name, campaign_name, objective ('mensajes'|'trafico'|'web'), status, created_time, creative_id, spend, impressions, reach, ctr, messages, thruplays`.
+   Columnas: `id, account_id, name, campaign_id, campaign_name, adset_id, adset_name, objective ('mensajes'|'trafico'|'web'), status, created_time, creative_id, spend, impressions, reach, ctr, messages, thruplays`.
    - `status`: códigos de Meta (`ACTIVE`, `PAUSED`, `ARCHIVED`, `CAMPAIGN_PAUSED`, `ADSET_PAUSED`, `WITH_ISSUES`, `DELETED`). En exportaciones CSV: `active` → `ACTIVE`, `not_delivering` → `NOT_DELIVERING`, `inactive` → `INACTIVE`.
    - `ctr` en % (0.84 = 0,84 %). `spend` en CLP entero.
    - `on conflict (id) do update set ... , synced_at = now()`.

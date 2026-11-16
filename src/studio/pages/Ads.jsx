@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Lock, CheckCircle2, RefreshCw, Search, Lightbulb, Wrench, Bell } from 'lucide-react'
+import { AlertTriangle, Lock, CheckCircle2, ChevronRight, ArrowUpDown, RefreshCw, Search, Lightbulb, Wrench, Bell } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q } from '../lib/api'
 import { useStudio } from '../lib/store'
@@ -132,7 +132,7 @@ export default function Ads() {
             <Card className="border-red/40 p-4 text-sm">
               <p className="flex items-center gap-2 font-medium"><AlertTriangle size={15} className="text-red" /> Anuncios activos que gastan sin traer conversaciones</p>
               <p className="mt-1 text-foreground-muted">
-                {view.leaks.length} anuncios de tráfico activos acumulan {clp(view.leaks.reduce((s, a) => s + Number(a.spend), 0))} con{' '}
+                {view.leaks.length === 1 ? '1 anuncio de tráfico activo acumula' : `${view.leaks.length} anuncios de tráfico activos acumulan`} {clp(view.leaks.reduce((s, a) => s + Number(a.spend), 0))} con{' '}
                 {num(view.leaks.reduce((s, a) => s + a.messages, 0))} conversaciones. Conviene pasarlos a campaña de mensajes o pausarlos.
               </p>
             </Card>
@@ -148,34 +148,11 @@ export default function Ads() {
             )}
           </Card>
 
-          <Card className="p-4">
-            <h2 className="mb-3 text-sm font-semibold">Cuentas publicitarias</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="text-xs text-foreground-muted">
-                  <tr><th className="py-1.5">Cuenta</th><th>Estado</th><th className="text-right">Inversión</th><th className="text-right">Conversaciones</th><th className="text-right">Costo/conv.</th></tr>
-                </thead>
-                <tbody>
-                  {view.accounts.map(a => {
-                    const s = SYNC[a.sync_status]
-                    return (
-                      <tr key={a.id} className="border-t border-border">
-                        <td className="py-2">{a.name}<span className="block text-[11px] text-foreground-subtle">{a.brand} · {a.id}</span></td>
-                        <td><Badge color={s.color}>{s.label}</Badge></td>
-                        <td className="text-right tabular-nums">{a.sync_status === 'ok' ? clp(a.spend) : '—'}</td>
-                        <td className="text-right tabular-nums">{a.sync_status === 'ok' ? num(a.messages) : '—'}</td>
-                        <td className="text-right tabular-nums">{a.sync_status === 'ok' ? clp(cpm(a.spend, a.messages)) : '—'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <Explorer accounts={view.accounts} ads={data.ads.filter(a => view.accounts.some(x => x.id === a.account_id))} />
 
           <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Videos y anuncios</h2>
+              <h2 className="text-sm font-semibold">Ranking de videos · todas las cuentas</h2>
               <div className="flex gap-2">
                 <Select value={objective} onChange={e => setObjective(e.target.value)} className="h-8! w-auto! text-xs!">
                   <option value="mensajes">Campañas de WhatsApp</option>
@@ -198,6 +175,133 @@ export default function Ads() {
         </div>
       )}
     </div>
+  )
+}
+
+const sumBy = (rows, k) => rows.reduce((s, r) => s + Number(r[k] || 0), 0)
+// CTR ponderado por impresiones (el CTR no se puede sumar)
+const ctrOf = rows => {
+  const imp = sumBy(rows, 'impressions')
+  return imp ? rows.reduce((s, r) => s + Number(r.ctr || 0) * Number(r.impressions || 0), 0) / imp : null
+}
+const agg = rows => {
+  const spend = sumBy(rows, 'spend'), messages = sumBy(rows, 'messages')
+  return { spend, messages, impressions: sumBy(rows, 'impressions'), thruplays: sumBy(rows, 'thruplays'), ctr: ctrOf(rows), cost: cpm(spend, messages), activeAds: rows.filter(r => r.status === 'ACTIVE').length, adsCount: rows.length }
+}
+
+// Explorador jerárquico: Cuenta → Campaña → Anuncios (agrupados por conjunto)
+function Explorer({ accounts, ads }) {
+  const [accountId, setAccountId] = useState(null)
+  const [campaign, setCampaign] = useState(null)
+  const [sort, setSort] = useState({ key: 'spend', dir: -1 })
+  const total = sumBy(ads, 'spend')
+  const account = accounts.find(a => a.id === accountId)
+
+  const level = !account ? 'account' : !campaign ? 'campaign' : 'ad'
+  let rows
+  if (level === 'account') {
+    rows = accounts.map(a => {
+      const r = ads.filter(x => x.account_id === a.id)
+      return { key: a.id, name: a.name, sub: `${a.brand} · ${a.id}`, badge: SYNC[a.sync_status], ok: a.sync_status === 'ok' && r.length > 0,
+        campaigns: new Set(r.map(x => x.campaign_name)).size, ...agg(r) }
+    })
+  } else if (level === 'campaign') {
+    const byCampaign = {}
+    for (const x of ads.filter(x => x.account_id === account.id)) (byCampaign[x.campaign_name || 'Sin campaña'] ||= []).push(x)
+    rows = Object.entries(byCampaign).map(([name, r]) => {
+      const a = agg(r)
+      return { key: name, name, sub: `${OBJECTIVE[r[0].objective] || r[0].objective} · ${new Set(r.map(x => x.adset_name)).size} conjunto(s)`,
+        badge: a.activeAds ? { label: 'Activa', color: '#22C55E' } : { label: 'Inactiva', color: '#8A8F98' }, ok: true, ...a }
+    })
+  } else {
+    rows = ads.filter(x => x.account_id === account.id && (x.campaign_name || 'Sin campaña') === campaign).map(x => ({
+      key: x.id, name: x.name, sub: x.adset_name ? `Conjunto: ${x.adset_name}` : `ID ${x.id}`, adset: x.adset_name,
+      badge: { label: STATUS_LABEL[x.status] || x.status, color: x.status === 'ACTIVE' ? '#22C55E' : '#8A8F98' }, ok: false,
+      spend: Number(x.spend), messages: x.messages, impressions: Number(x.impressions), thruplays: x.thruplays, ctr: x.ctr == null ? null : Number(x.ctr),
+      cost: cpm(Number(x.spend), x.messages), reach: Number(x.reach),
+    }))
+  }
+  const val = (r, k) => k === 'name' ? r.name : (r[k] ?? (sort.dir < 0 ? -Infinity : Infinity))
+  rows.sort((a, b) => {
+    const x = val(a, sort.key), y = val(b, sort.key)
+    return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir
+  })
+  const levelTotal = agg(level === 'account' ? ads : level === 'campaign' ? ads.filter(x => x.account_id === account.id)
+    : ads.filter(x => x.account_id === account.id && (x.campaign_name || 'Sin campaña') === campaign))
+
+  const open = r => {
+    if (!r.ok) return
+    if (level === 'account') { setAccountId(r.key); setCampaign(null) } else if (level === 'campaign') setCampaign(r.key)
+  }
+  const Th = ({ k, children, left }) => (
+    <th className={cx('cursor-pointer select-none whitespace-nowrap py-1.5 font-medium hover:text-foreground', !left && 'text-right')} onClick={() => setSort(s => ({ key: k, dir: s.key === k ? -s.dir : -1 }))}>
+      <span className="inline-flex items-center gap-1">{children}{sort.key === k && <ArrowUpDown size={11} />}</span>
+    </th>
+  )
+  const crumb = 'rounded px-1.5 py-0.5 hover:bg-surface-hover'
+  const firstCol = { account: 'Cuenta', campaign: 'Campaña', ad: 'Anuncio' }[level]
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-1 text-sm">
+        <button className={cx(crumb, level === 'account' ? 'font-semibold' : 'text-foreground-muted')} onClick={() => { setAccountId(null); setCampaign(null) }}>Todas las cuentas</button>
+        {account && <><ChevronRight size={14} className="text-foreground-subtle" /><button className={cx(crumb, level === 'campaign' ? 'font-semibold' : 'text-foreground-muted')} onClick={() => setCampaign(null)}>{account.name}</button></>}
+        {campaign && <><ChevronRight size={14} className="text-foreground-subtle" /><span className="px-1.5 font-semibold">{campaign}</span></>}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px] text-left text-sm [&_td]:px-2 [&_th]:px-2 [&_td:first-child]:pl-0 [&_th:first-child]:pl-0">
+          <thead className="text-xs text-foreground-muted">
+            <tr>
+              <Th k="name" left>{firstCol}</Th><th className="py-1.5 font-medium">Estado</th>
+              {level === 'account' && <Th k="campaigns">Campañas</Th>}
+              {level !== 'ad' && <Th k="activeAds">Anuncios activos</Th>}
+              <Th k="spend">Inversión</Th><th className="py-1.5 text-right font-medium">% del total</th>
+              <Th k="impressions">Impresiones</Th><Th k="ctr">CTR</Th>
+              {level === 'ad' && <Th k="thruplays">ThruPlays</Th>}
+              <Th k="messages">Conversaciones</Th><Th k="cost">Costo/conv.</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.key} onClick={() => open(r)} className={cx('border-t border-border', r.ok && 'cursor-pointer hover:bg-surface-hover')}>
+                <td className="max-w-80 py-2 pr-2">
+                  <span className="flex items-center gap-1">
+                    <span className="line-clamp-2">{r.name}</span>
+                    {r.ok && <ChevronRight size={14} className="shrink-0 text-foreground-subtle" />}
+                  </span>
+                  <span className="block text-[11px] text-foreground-subtle">{r.sub}</span>
+                </td>
+                <td><Badge color={r.badge.color}>{r.badge.label}</Badge></td>
+                {level === 'account' && <td className="text-right tabular-nums">{r.ok ? r.campaigns : '—'}</td>}
+                {level !== 'ad' && <td className="text-right tabular-nums">{r.ok ? r.activeAds : '—'}</td>}
+                <td className="text-right tabular-nums">{r.adsCount === 0 ? '—' : clp(r.spend)}</td>
+                <td className="text-right tabular-nums text-foreground-muted">{total && r.spend ? `${((r.spend / total) * 100).toFixed(1)}%` : '—'}</td>
+                <td className="text-right tabular-nums">{r.adsCount === 0 ? '—' : num(r.impressions)}</td>
+                <td className="text-right tabular-nums">{r.ctr == null ? '—' : `${r.ctr.toFixed(2)}%`}</td>
+                {level === 'ad' && <td className="text-right tabular-nums">{num(r.thruplays)}</td>}
+                <td className="text-right tabular-nums">{r.adsCount === 0 ? '—' : num(r.messages)}</td>
+                <td className={cx('text-right tabular-nums', r.cost > 10000 && 'text-red')}>{clp(r.cost)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="border-t-2 border-border text-sm font-semibold">
+            <tr>
+              <td className="py-2">Total</td><td />
+              {level === 'account' && <td className="text-right tabular-nums">{rows.reduce((s, r) => s + (r.campaigns || 0), 0)}</td>}
+              {level !== 'ad' && <td className="text-right tabular-nums">{levelTotal.activeAds}</td>}
+              <td className="text-right tabular-nums">{clp(levelTotal.spend)}</td>
+              <td className="text-right tabular-nums text-foreground-muted">{total ? `${((levelTotal.spend / total) * 100).toFixed(1)}%` : '—'}</td>
+              <td className="text-right tabular-nums">{num(levelTotal.impressions)}</td>
+              <td className="text-right tabular-nums">{levelTotal.ctr == null ? '—' : `${levelTotal.ctr.toFixed(2)}%`}</td>
+              {level === 'ad' && <td className="text-right tabular-nums">{num(levelTotal.thruplays)}</td>}
+              <td className="text-right tabular-nums">{num(levelTotal.messages)}</td>
+              <td className="text-right tabular-nums">{clp(levelTotal.cost)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {level === 'account' && <p className="mt-2 text-xs text-foreground-subtle">Haz clic en una cuenta para ver sus campañas, y en una campaña para ver sus anuncios.</p>}
+    </Card>
   )
 }
 

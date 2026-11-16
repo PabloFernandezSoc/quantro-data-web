@@ -501,3 +501,6 @@ create index if not exists ad_ops_log_client_idx on public.ad_ops_log (client_id
 alter table public.ad_ops_log enable row level security;
 create policy "ad_ops_log_select" on public.ad_ops_log for select to authenticated using (public.can_view_client(client_id));
 create policy "ad_ops_log_admin"  on public.ad_ops_log for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Jerarquía campaña / conjunto para el explorador Cuenta → Campaña → Anuncios
+alter table public.ad_ads add column if not exists campaign_id text, add column if not exists adset_id text, add column if not exists adset_name text;
