@@ -423,3 +423,61 @@ create policy "grid_uploads_select" on public.grid_uploads for select to authent
 
 -- ── Realtime ─────────────────────────────────────────────────
 alter publication supabase_realtime add table public.pieces, public.piece_parts, public.comments;
+
+-- ─────────────────────────────────────────────────────────────
+-- Publicidad (/app/publicidad): reporte de Meta Ads por cliente
+-- Carga: sincronización vía MCP de Meta (o API) → upsert en estas tablas.
+-- ─────────────────────────────────────────────────────────────
+
+create table if not exists public.ad_accounts (
+  id            text primary key,              -- id de cuenta en Meta (sin act_)
+  client_id     uuid not null references public.clients (id) on delete cascade,
+  name          text not null,
+  brand         text,
+  currency      text not null default 'CLP',
+  sync_status   text not null default 'ok' check (sync_status in ('ok', 'sin_acceso', 'bloqueada')),
+  sync_note     text,
+  synced_at     timestamptz,
+  created_at    timestamptz not null default now()
+);
+create index if not exists ad_accounts_client_idx on public.ad_accounts (client_id);
+
+create table if not exists public.ad_monthly (
+  account_id  text not null references public.ad_accounts (id) on delete cascade,
+  month       date not null check (extract(day from month) = 1),
+  spend       numeric not null default 0,
+  messages    int not null default 0,
+  primary key (account_id, month)
+);
+
+create table if not exists public.ad_ads (
+  id            text primary key,
+  account_id    text not null references public.ad_accounts (id) on delete cascade,
+  name          text not null,
+  campaign_name text,
+  objective     text,                           -- 'mensajes' | 'trafico' | 'web'
+  status        text,
+  created_time  timestamptz,
+  creative_id   text,
+  spend         numeric not null default 0,
+  impressions   bigint not null default 0,
+  reach         bigint not null default 0,
+  ctr           numeric,
+  messages      int not null default 0,
+  thruplays     int not null default 0,
+  synced_at     timestamptz not null default now()
+);
+create index if not exists ad_ads_account_idx on public.ad_ads (account_id);
+
+alter table public.ad_accounts enable row level security;
+alter table public.ad_monthly  enable row level security;
+alter table public.ad_ads      enable row level security;
+
+create policy "ad_accounts_select" on public.ad_accounts for select to authenticated using (public.can_view_client(client_id));
+create policy "ad_accounts_admin"  on public.ad_accounts for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "ad_monthly_select" on public.ad_monthly for select to authenticated
+  using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_client(a.client_id)));
+create policy "ad_monthly_admin"  on public.ad_monthly for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "ad_ads_select" on public.ad_ads for select to authenticated
+  using (exists (select 1 from public.ad_accounts a where a.id = account_id and public.can_view_client(a.client_id)));
+create policy "ad_ads_admin"  on public.ad_ads for all to authenticated using (public.is_admin()) with check (public.is_admin());

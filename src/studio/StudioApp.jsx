@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ListChecks, BookOpenText, Inbox, LayoutGrid, Table2, CalendarDays, ClipboardPaste, BarChart3, UserCog, CircleUser, LogOut, Menu, X,
+  ListChecks, BookOpenText, Inbox, LayoutGrid, Table2, CalendarDays, ClipboardPaste, BarChart3, Megaphone, UserCog, CircleUser, LogOut, Menu, X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { LogoMark } from '../components/Logo'
@@ -16,6 +16,7 @@ import GridView from './pages/GridView'
 import Calendar from './pages/Calendar'
 import ImportGrid from './pages/ImportGrid'
 import Metrics from './pages/Metrics'
+import Ads from './pages/Ads'
 import Admin from './pages/Admin'
 import Account from './pages/Account'
 
@@ -47,6 +48,7 @@ const PAGES = {
   grilla: { label: 'Grilla', icon: Table2, component: GridView },
   calendario: { label: 'Calendario', icon: CalendarDays, component: Calendar },
   importar: { label: 'Importar Sheet', icon: ClipboardPaste, component: ImportGrid, editors: true },
+  publicidad: { label: 'Publicidad', icon: Megaphone, component: Ads },
   metricas: { label: 'Métricas', icon: BarChart3, component: Metrics, editors: true },
   admin: { label: 'Administración', icon: UserCog, component: Admin, admin: true },
   cuenta: { label: 'Mi cuenta', icon: CircleUser, component: Account },
