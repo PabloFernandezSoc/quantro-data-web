@@ -16,6 +16,11 @@ export function navigate(path) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
+// Orden de piezas de la vista actual, para pasar a la anterior/siguiente desde el detalle
+let pieceNav = []
+export function setPieceNav(ids) { pieceNav = ids }
+export function getPieceNav() { return pieceNav }
+
 // El detalle de pieza se abre como modal sobre cualquier sección (?pieza=<id>)
 export function openPiece(id, vista) {
   const url = new URL(window.location.href)
