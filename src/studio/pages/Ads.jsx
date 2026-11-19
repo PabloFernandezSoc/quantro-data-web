@@ -85,15 +85,17 @@ export default function Ads() {
       try {
         const accounts = await q(supabase.from('ad_accounts').select('*').eq('client_id', clientId).order('name'))
         const ids = accounts.map(a => a.id)
-        const [monthly, ads, daily, log, funnel, crmSync] = await Promise.all([
+        const [monthly, ads, daily, log, funnel, crmSync, weekly, events] = await Promise.all([
           ids.length ? q(supabase.from('ad_monthly').select('*').in('account_id', ids).order('month')) : [],
           ids.length ? q(supabase.from('ad_ads').select('*').in('account_id', ids)) : [],
           ids.length ? fetchAll(() => supabase.from('ad_daily').select('*').in('account_id', ids).order('date')) : [],
           q(supabase.from('ad_ops_log').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30)),
           q(supabase.from('crm_funnel_monthly').select('*').eq('client_id', clientId).order('month')),
           q(supabase.from('crm_sync').select('*').eq('client_id', clientId)),
+          q(supabase.from('crm_funnel_weekly').select('*').eq('client_id', clientId).order('week')),
+          q(supabase.from('ad_events').select('*').eq('client_id', clientId).order('date')),
         ])
-        if (alive) { setData({ accounts, monthly, ads, daily, log, funnel, crmSync: crmSync[0] || null }); setError(null) }
+        if (alive) { setData({ accounts, monthly, ads, daily, log, funnel, crmSync: crmSync[0] || null, weekly, events }); setError(null) }
       } catch (e) {
         if (alive) setError(e.message)
       }
@@ -273,7 +275,11 @@ export default function Ads() {
           </Card>
 
           {data.funnel.length > 0
-            ? <CommercialFunnel funnel={data.funnel} sync={data.crmSync} allAccounts={data.accounts} accounts={view.accounts} monthly={data.monthly} daily={data.daily} range={range} today={today} />
+            ? <>
+                <CommercialFunnel funnel={data.funnel} sync={data.crmSync} allAccounts={data.accounts} accounts={view.accounts} monthly={data.monthly} daily={data.daily} range={range} today={today} />
+                <FunnelEvolution weekly={data.weekly} funnel={data.funnel} events={data.events} accounts={data.accounts} range={range} today={today} />
+                <SpendMixAndCac funnel={data.funnel} sync={data.crmSync} accounts={data.accounts} monthly={data.monthly} daily={data.daily} events={data.events} range={range} today={today} />
+              </>
             : <FunnelPreview messages={view.messages} />}
 
           <OpsLog log={data.log} accounts={data.accounts} />
@@ -769,16 +775,7 @@ function CommercialFunnel({ funnel, sync, allAccounts, accounts, monthly, daily,
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {steps.map(([label, value, sub], i) => (
-              <div key={label} className="relative rounded-lg border border-border p-3">
-                <p className="text-[11px] text-foreground-muted">{label}</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums">{num(value)}</p>
-                <p className="text-[11px] text-foreground-subtle">{sub}</p>
-                {i > 0 && <ChevronRight size={14} className="absolute -left-2.5 top-1/2 hidden -translate-y-1/2 text-foreground-subtle sm:block" />}
-              </div>
-            ))}
-          </div>
+          <FunnelChart steps={steps} />
           <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
             <Mini label="Costo por reunión agendada" value={clp(per(spend, scheduledWithSpend))} sub="inversión / reuniones" />
             <Mini label="Costo por cliente" value={clp(per(spend, salesWithSpend))} sub={basis === 'cohorte' ? 'lo que cuesta en publicidad cada cliente' : 'inversión / ventas cerradas en el período'} />
@@ -854,6 +851,275 @@ function FunnelByMonth({ funnel, basis, spendBy, selected, isOpen }) {
       </table>
       <p className="mt-1.5 text-[11px] text-foreground-subtle">Costo por cliente en verde: mejor que la mediana de los 3 meses anteriores; en rojo: más de 20% peor.</p>
     </div>
+  )
+}
+
+// ── Gráfico funnel: barras centradas, ancho proporcional a la etapa, con la caída entre etapas ──
+function FunnelChart({ steps }) {
+  const [hover, setHover] = useState(null)
+  const top = steps[0]?.[1] || 0
+  const w = v => (top ? Math.max(1.2, (v / top) * 100) : 0)
+  return (
+    <div className="rounded-lg border border-border p-3" onMouseLeave={() => setHover(null)}>
+      {steps.map(([label, value, sub], i) => {
+        const prev = i > 0 ? steps[i - 1][1] : null
+        const lost = prev != null ? prev - value : null
+        const active = hover === i
+        return (
+          <div key={label}>
+            {i > 0 && (
+              <div className="flex h-3 sm:gap-3">
+                <div className="hidden sm:block sm:w-40 sm:shrink-0" />
+                <div className="relative h-full flex-1">
+                  <div className="absolute inset-0 bg-accent/15" style={{ clipPath: `polygon(${50 - w(prev) / 2}% 0, ${50 + w(prev) / 2}% 0, ${50 + w(value) / 2}% 100%, ${50 - w(value) / 2}% 100%)` }} />
+                </div>
+                <div className="hidden sm:block sm:w-44 sm:shrink-0" />
+              </div>
+            )}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3" onMouseEnter={() => setHover(i)}>
+              <div className="flex items-baseline justify-between sm:block sm:w-40 sm:shrink-0">
+                <p className={cx('text-xs', active ? 'text-foreground' : 'text-foreground-muted')}>{label}</p>
+                <p className="text-sm font-semibold tabular-nums sm:hidden">{num(value)}</p>
+              </div>
+              <div className="relative h-8 w-full shrink-0 sm:w-auto sm:flex-1">
+                <div className={cx('absolute top-0 h-full rounded-md transition-colors', active ? 'bg-accent' : 'bg-accent/75')}
+                  style={{ left: `${50 - w(value) / 2}%`, width: `${w(value)}%` }} />
+                <span className="absolute inset-0 hidden items-center justify-center text-sm font-semibold tabular-nums text-white drop-shadow sm:flex">{num(value)}</span>
+              </div>
+              <div className="sm:w-44 sm:shrink-0">
+                <p className="text-[11px] text-foreground-muted">{sub}</p>
+                {active && lost != null && lost > 0 && <p className="text-[11px] text-foreground-subtle">{num(lost)} quedaron en la etapa anterior</p>}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      <p className="mt-2 text-[11px] text-foreground-subtle">El ancho de cada barra es proporcional a la primera etapa.</p>
+    </div>
+  )
+}
+
+// ── Evolución del embudo (semana o mes) con los cambios hechos en Meta ──
+const WEEK_DAYS = 7
+const weekLabel = w => `${dayName(w)}`
+const bucketKeyOf = (date, gran) => (gran === 'month' ? monthStartOf(date) : weekStartOf(date))
+const bucketEnd = (key, gran) => (gran === 'month' ? monthEndOf(key) : addDays(key, WEEK_DAYS - 1))
+const EVENT_KIND = {
+  campana_nueva: ['Campaña nueva', '#3987e5'],
+  pausa: ['Pausa', '#8A8F98'],
+  activacion: ['Reactivación', '#8A8F98'],
+  presupuesto_sube: ['Sube presupuesto', '#199e70'],
+  presupuesto_baja: ['Baja presupuesto', '#d95926'],
+  nota: ['Nota', '#8A8F98'],
+}
+
+function MiniChart({ title, points, kind = 'line', fmt, hover, setHover, eventsAt, note }) {
+  const W = 320, H = 116, padT = 8, padB = 16
+  const vals = points.map(p => p.value).filter(v => v != null)
+  const max = (Math.max(...vals, 0) || 1) * 1.15
+  const n = points.length || 1
+  const step = W / n
+  const x = i => step * (i + 0.5)
+  const y = v => padT + (H - padT - padB) * (1 - v / max)
+  const closed = points.map((p, i) => ({ ...p, i })).filter(p => p.value != null && !p.open)
+  const openPts = points.map((p, i) => ({ ...p, i })).filter(p => p.value != null && p.open)
+  const line = pts => pts.map((p, k) => `${k ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')
+  const shown = hover != null && points[hover] ? points[hover] : [...points].reverse().find(p => p.value != null && !p.open) || points.at(-1)
+  const labelEvery = Math.ceil(n / 6)
+  return (
+    <div className="min-w-0 rounded-lg border border-border p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs text-foreground-muted">{title}</p>
+        <p className="text-right text-sm font-semibold tabular-nums">
+          {shown?.value == null ? '—' : fmt(shown.value)}
+          <span className="ml-1 text-[11px] font-normal text-foreground-subtle">{shown?.label}{shown?.open ? ' · en curso' : ''}</span>
+        </p>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-28 w-full overflow-visible" onMouseLeave={() => setHover(null)} role="img" aria-label={title}>
+        <line x1="0" x2={W} y1={H - padB} y2={H - padB} stroke="rgba(255,255,255,0.12)" />
+        {points.map((p, i) => eventsAt[p.key]?.length ? (
+          <line key={`e${p.key}`} x1={x(i)} x2={x(i)} y1={padT - 4} y2={H - padB} stroke="#F59E0B" strokeOpacity="0.45" strokeDasharray="2 3" />
+        ) : null)}
+        {kind === 'bar' ? points.map((p, i) => p.value == null ? null : (
+          <rect key={p.key} x={x(i) - step * 0.32} width={step * 0.64} y={y(p.value)} height={Math.max(1, H - padB - y(p.value))} rx="3"
+            fill="var(--color-accent)" fillOpacity={p.open ? 0.35 : hover === i ? 1 : 0.8} />
+        )) : (
+          <>
+            <path d={line(closed)} fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinejoin="round" />
+            {closed.length > 0 && openPts.length > 0 && <path d={line([closed.at(-1), ...openPts])} fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeDasharray="3 4" strokeOpacity="0.6" />}
+            {hover != null && points[hover]?.value != null && <circle cx={x(hover)} cy={y(points[hover].value)} r="4.5" fill="var(--color-accent)" stroke="#0a0a0c" strokeWidth="2" />}
+          </>
+        )}
+        {points.map((p, i) => (i % labelEvery === 0 || i === n - 1) && (
+          <text key={`l${p.key}`} x={x(i)} y={H - 3} textAnchor="middle" fontSize="9" fill="#8A8F98">{p.label}</text>
+        ))}
+        {hover != null && <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="rgba(255,255,255,0.25)" />}
+        {points.map((p, i) => (
+          <rect key={`h${p.key}`} x={step * i} width={step} y="0" height={H} fill="transparent" onMouseEnter={() => setHover(i)} />
+        ))}
+      </svg>
+      {note && <p className="text-[10px] text-foreground-subtle">{note}</p>}
+    </div>
+  )
+}
+
+function FunnelEvolution({ weekly, funnel, events, accounts, range, today }) {
+  const [gran, setGran] = useState('week')
+  const [hover, setHover] = useState(null)
+  const accName = Object.fromEntries(accounts.map(a => [a.id, a.name]))
+  const src = gran === 'week'
+    ? weekly.map(r => ({ ...r, key: r.week }))
+    : funnel.filter(f => f.basis === 'cohorte').map(r => ({ ...r, key: r.month }))
+  if (!src.length) return null
+  // Ventana: lo que toca el filtro de período; si es corto, se muestran al menos 8 períodos para ver la tendencia
+  const inRange = r => !range || (bucketEnd(r.key, gran) >= range.since && r.key <= range.until)
+  let idx = src.map((r, i) => (inRange(r) ? i : -1)).filter(i => i >= 0)
+  if (!idx.length) idx = [src.length - 1]
+  const lo = Math.max(0, Math.min(idx[0], idx.at(-1) - 7)), hi = idx.at(-1)
+  const rows = src.slice(lo, hi + 1)
+  const openCut = addDays(today, -15)
+  const mk = f => rows.map(r => ({
+    key: r.key,
+    label: gran === 'week' ? weekLabel(r.key) : monthName(r.key),
+    value: f(r),
+    open: bucketEnd(r.key, gran) > openCut,
+    inRange: inRange(r),
+  }))
+  const pct = (a, b) => (b ? (a / b) * 100 : null)
+  const fmtPct = v => `${(Math.round(v * 10) / 10).toLocaleString('es-CL')}%`
+  const eventsAt = {}
+  for (const e of events) {
+    const k = bucketKeyOf(e.date, gran)
+    if (rows.some(r => r.key === k)) (eventsAt[k] ||= []).push(e)
+  }
+  const visibleEvents = rows.flatMap(r => eventsAt[r.key] || []).sort((a, b) => b.date.localeCompare(a.date))
+  const hoverKey = hover != null ? rows[hover]?.key : null
+  const list = hoverKey && eventsAt[hoverKey] ? eventsAt[hoverKey] : visibleEvents
+  const share = { hover, setHover, eventsAt }
+
+  return (
+    <Card className="p-4">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Evolución del embudo y cambios en las campañas</h2>
+        <div className="flex rounded-lg border border-border p-0.5 text-xs">
+          {[['week', 'Semana'], ['month', 'Mes']].map(([k, l]) => (
+            <button key={k} onClick={() => { setGran(k); setHover(null) }} className={cx('rounded-md px-3 py-1', gran === k ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground')}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <p className="mb-3 text-xs text-foreground-muted">
+        Por {gran === 'week' ? 'semana' : 'mes'} del primer mensaje en WhatsApp. Las líneas punteadas verticales marcan cambios en Meta; pasa el mouse para ver el detalle.
+        Los períodos de las últimas 2 semanas están <span className="text-foreground">en curso</span>: sus ventas todavía pueden subir.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <MiniChart title="Personas nuevas que escribieron" kind="bar" points={mk(r => r.new_contacts)} fmt={num} {...share} />
+        <MiniChart title="% que agenda reunión" points={mk(r => pct(r.scheduled, r.new_contacts))} fmt={fmtPct} {...share} />
+        <MiniChart title="% que asiste (de los agendados)" points={mk(r => pct(r.attended, r.scheduled))} fmt={fmtPct} {...share} />
+        <MiniChart title="% que contrata (de los asistentes)" points={mk(r => pct(r.sales, r.attended))} fmt={fmtPct} {...share} />
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <MiniChart title="Clientes nuevos" kind="bar" points={mk(r => r.sales)} fmt={num} {...share} />
+        <MiniChart title="Honorarios contratados" kind="bar" points={mk(r => (r.revenue_contracted == null ? null : Number(r.revenue_contracted)))} fmt={clp} {...share} />
+      </div>
+
+      <div className="mt-4">
+        <h3 className="mb-2 text-xs font-semibold">
+          Cambios en Meta {hoverKey && eventsAt[hoverKey] ? `· ${gran === 'week' ? `semana del ${weekLabel(hoverKey)}` : monthName(hoverKey)}` : 'en el período mostrado'}
+        </h3>
+        {list.length === 0 ? <p className="text-xs text-foreground-muted">Sin cambios registrados en este período.</p> : (
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+            {list.map(e => (
+              <li key={e.id || `${e.account_id}${e.date}`} className="flex gap-2 text-xs">
+                <span className="w-14 shrink-0 tabular-nums text-foreground-muted">{dayName(e.date)}</span>
+                <span className="w-28 shrink-0"><Badge color={EVENT_KIND[e.kind]?.[1]}>{EVENT_KIND[e.kind]?.[0] || e.kind}</Badge></span>
+                <span className="min-w-0">
+                  <span className="text-foreground">{e.title}</span>
+                  <span className="text-foreground-subtle"> · {accName[e.account_id] || e.account_id}{e.source === 'inferido' ? ' (según la fecha del primer anuncio)' : ''}</span>
+                  {e.detail && <span className="block text-foreground-subtle">{e.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-2 text-[11px] text-foreground-subtle">
+          Cambios leídos del historial de Meta. La cuenta principal todavía no tiene historial disponible por API: de ella solo se ve cuándo partió cada campaña.
+          Un cambio cerca de una subida o bajada no prueba que la haya causado.
+        </p>
+      </div>
+    </Card>
+  )
+}
+
+// ── Inversión por cuenta (barras apiladas) y costo por cliente, mes a mes ──
+const ACCOUNT_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500'] // validados para fondo oscuro (CVD y contraste)
+function SpendMixAndCac({ funnel, sync, accounts, monthly, daily, events, range, today }) {
+  const [hover, setHover] = useState(null)
+  const brandAccounts = accounts.filter(a => a.sync_status === 'ok' && (!sync?.brand || a.brand === sync.brand))
+  const ids = new Set(brandAccounts.map(a => a.id))
+  const months = [...new Set(monthly.filter(m => ids.has(m.account_id)).map(m => m.month))].sort()
+  if (!months.length) return null
+  const perAcc = {}
+  for (const a of brandAccounts) {
+    const s = spendByMonth(monthly, daily, new Set([a.id]))
+    perAcc[a.id] = s
+  }
+  // Orden fijo: cuenta con más inversión total primero (el color sigue a la cuenta, no al ranking del mes)
+  const order = brandAccounts.map(a => ({ a, total: months.reduce((s, m) => s + (perAcc[a.id][m]?.spend || 0), 0) }))
+    .filter(x => x.total > 0).sort((x, y) => y.total - x.total).map(x => x.a)
+  const color = Object.fromEntries(order.map((a, i) => [a.id, ACCOUNT_COLORS[i] || '#8A8F98']))
+  const totalOf = m => order.reduce((s, a) => s + (perAcc[a.id][m]?.spend || 0), 0)
+  const max = Math.max(...months.map(totalOf), 1)
+  const sel = m => !range || (monthEndOf(m) >= range.since && m <= range.until)
+  const cohort = Object.fromEntries(funnel.filter(f => f.basis === 'cohorte').map(f => [f.month, f]))
+  const agenda = Object.fromEntries(funnel.filter(f => f.basis === 'agenda').map(f => [f.month, f]))
+  const cacPoints = months.map(m => {
+    const c = cohort[m], s = totalOf(m)
+    const v = c ? (c.sales ? s / c.sales : null) : agenda[m]?.sales_in_month ? s / agenda[m].sales_in_month : null
+    return { key: m, label: monthName(m), value: v, open: monthEndOf(m) > addDays(today, -15), inRange: sel(m) }
+  })
+  const eventsAt = {}
+  for (const e of events) { const k = monthStartOf(e.date); if (months.includes(k)) (eventsAt[k] ||= []).push(e) }
+  const hm = hover != null ? months[hover] : null
+  return (
+    <Card className="p-4">
+      <h2 className="text-sm font-semibold">Inversión por cuenta y costo por cliente</h2>
+      <p className="mb-3 text-xs text-foreground-muted">Cómo se repartió la inversión entre cuentas cada mes, y cuánto costó cada cliente nuevo en ese mes.</p>
+      <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+        <div className="rounded-lg border border-border p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs text-foreground-muted">Inversión mensual por cuenta</p>
+            <p className="text-sm font-semibold tabular-nums">{clp(totalOf(hm || months.at(-1)))} <span className="text-[11px] font-normal text-foreground-subtle">{monthName(hm || months.at(-1))}</span></p>
+          </div>
+          <div className="mt-2 flex h-40 items-end gap-2" onMouseLeave={() => setHover(null)}>
+            {months.map((m, i) => (
+              <div key={m} className={cx('flex h-full flex-1 flex-col justify-end', !sel(m) && 'opacity-40')} onMouseEnter={() => setHover(i)}>
+                <div className="flex w-full flex-col-reverse gap-[2px]" style={{ height: `${(totalOf(m) / max) * 100}%` }}>
+                  {order.map(a => {
+                    const v = perAcc[a.id][m]?.spend || 0
+                    if (!v) return null
+                    return <div key={a.id} className="w-full first:rounded-b-sm last:rounded-t-[4px]" style={{ flexGrow: v, flexBasis: 0, background: color[a.id], opacity: hover == null || hover === i ? 1 : 0.55 }} title={`${a.name}: ${clp(v)}`} />
+                  })}
+                </div>
+                <span className="mt-1 text-center text-[10px] capitalize text-foreground-muted">{monthName(m)}</span>
+              </div>
+            ))}
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+            {order.map(a => {
+              const v = hm ? perAcc[a.id][hm]?.spend || 0 : null
+              return (
+                <li key={a.id} className="flex items-center gap-1.5 text-foreground-muted">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: color[a.id] }} />
+                  {a.name}{hm && <span className="tabular-nums text-foreground">{clp(v)} ({pctOf(v, totalOf(hm))})</span>}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+        <MiniChart title="Costo por cliente nuevo" points={cacPoints} fmt={clp} hover={hover} setHover={setHover} eventsAt={eventsAt}
+          note="Meses con primer contacto en WhatsApp (desde ago-26) usan cohorte; antes, ventas cerradas en el mes." />
+      </div>
+    </Card>
   )
 }
 

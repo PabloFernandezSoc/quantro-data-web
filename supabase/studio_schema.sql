@@ -638,3 +638,41 @@ create policy "crm_sync_admin"  on public.crm_sync for all to authenticated usin
 
 -- Marca a la que corresponde el embudo (para calcular costos solo con sus cuentas)
 alter table public.crm_sync add column if not exists brand text;
+
+-- Embudo por semana (cohorte del primer mensaje) y cambios en campañas de Meta
+create table if not exists public.crm_funnel_weekly (
+  client_id            uuid not null references public.clients (id) on delete cascade,
+  week                 date not null check (extract(isodow from week) = 1),
+  new_contacts         int not null default 0,
+  returning_contacts   int,
+  scheduled            int not null default 0,
+  attended             int not null default 0,
+  eligible             int not null default 0,
+  proposals            int not null default 0,
+  sales                int not null default 0,
+  revenue_contracted   numeric,
+  median_days_to_sale  int,
+  synced_at            timestamptz not null default now(),
+  primary key (client_id, week)
+);
+alter table public.crm_funnel_weekly enable row level security;
+create policy "crm_funnel_weekly_select" on public.crm_funnel_weekly for select to authenticated using (public.can_view_ads(client_id));
+create policy "crm_funnel_weekly_admin"  on public.crm_funnel_weekly for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create table if not exists public.ad_events (
+  id            uuid primary key default gen_random_uuid(),
+  client_id     uuid not null references public.clients (id) on delete cascade,
+  account_id    text references public.ad_accounts (id) on delete set null,
+  date          date not null,
+  kind          text not null check (kind in ('campana_nueva', 'pausa', 'activacion', 'presupuesto_sube', 'presupuesto_baja', 'nota')),
+  title         text not null,
+  detail        text,
+  budget_delta  numeric,
+  source        text not null default 'meta_log' check (source in ('meta_log', 'inferido', 'manual')),
+  created_at    timestamptz not null default now(),
+  unique (client_id, account_id, date)
+);
+create index if not exists ad_events_client_date_idx on public.ad_events (client_id, date);
+alter table public.ad_events enable row level security;
+create policy "ad_events_select" on public.ad_events for select to authenticated using (public.can_view_ads(client_id));
+create policy "ad_events_admin"  on public.ad_events for all to authenticated using (public.is_admin()) with check (public.is_admin());
