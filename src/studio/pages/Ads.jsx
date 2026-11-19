@@ -85,13 +85,15 @@ export default function Ads() {
       try {
         const accounts = await q(supabase.from('ad_accounts').select('*').eq('client_id', clientId).order('name'))
         const ids = accounts.map(a => a.id)
-        const [monthly, ads, daily, log] = await Promise.all([
+        const [monthly, ads, daily, log, funnel, crmSync] = await Promise.all([
           ids.length ? q(supabase.from('ad_monthly').select('*').in('account_id', ids).order('month')) : [],
           ids.length ? q(supabase.from('ad_ads').select('*').in('account_id', ids)) : [],
           ids.length ? fetchAll(() => supabase.from('ad_daily').select('*').in('account_id', ids).order('date')) : [],
           q(supabase.from('ad_ops_log').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30)),
+          q(supabase.from('crm_funnel_monthly').select('*').eq('client_id', clientId).order('month')),
+          q(supabase.from('crm_sync').select('*').eq('client_id', clientId)),
         ])
-        if (alive) { setData({ accounts, monthly, ads, daily, log }); setError(null) }
+        if (alive) { setData({ accounts, monthly, ads, daily, log, funnel, crmSync: crmSync[0] || null }); setError(null) }
       } catch (e) {
         if (alive) setError(e.message)
       }
@@ -270,7 +272,9 @@ export default function Ads() {
             <AdsTable ads={view.sorted} totalSpend={sumBy(view.ads, 'spend')} />
           </Card>
 
-          <FunnelPreview messages={view.messages} />
+          {data.funnel.length > 0
+            ? <CommercialFunnel funnel={data.funnel} sync={data.crmSync} allAccounts={data.accounts} accounts={view.accounts} monthly={data.monthly} daily={data.daily} range={range} today={today} />
+            : <FunnelPreview messages={view.messages} />}
 
           <OpsLog log={data.log} accounts={data.accounts} />
         </div>
@@ -660,6 +664,196 @@ function FunnelPreview({ messages }) {
         ))}
       </div>
     </Card>
+  )
+}
+
+// ── Embudo comercial real: WhatsApp (HiBot) → reuniones y ventas (Airtable) ──
+// Datos mensuales en crm_funnel_monthly, cargados desde la carpeta "Tus deudas" (cruce por teléfono).
+// basis 'cohorte' = mes del primer mensaje en WhatsApp; 'agenda' = mes en que se agendó la reunión.
+const BASIS = { cohorte: 'Por primer contacto', agenda: 'Por fecha de agendamiento' }
+const pctOf = (a, b) => (b ? `${(Math.round((a / b) * 1000) / 10).toLocaleString('es-CL')}%` : '—')
+const ratio = (a, b) => (a && b ? `${(a / b).toFixed(1).replace('.', ',')}×` : '—')
+const median = arr => { const s = arr.filter(x => x != null).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null }
+
+// Gasto y conversaciones del mes por cuenta: lo más actualizado entre el total mensual y la suma diaria
+function spendByMonth(monthly, daily, ids) {
+  const out = {}
+  const months = new Set(monthly.filter(m => ids.has(m.account_id)).map(m => m.month))
+  for (const d of daily) if (ids.has(d.account_id)) months.add(monthStartOf(d.date))
+  for (const month of months) {
+    let spend = 0, messages = 0
+    for (const id of ids) {
+      const mm = monthly.find(x => x.account_id === id && x.month === month)
+      const dd = daily.filter(d => d.account_id === id && d.date.startsWith(month.slice(0, 7)))
+      const ds = sumBy(dd, 'spend'), dm = sumBy(dd, 'messages')
+      const useDaily = ds >= Number(mm?.spend || 0)
+      spend += useDaily ? ds : Number(mm.spend); messages += useDaily ? dm : mm.messages
+    }
+    out[month] = { spend, messages }
+  }
+  return out
+}
+
+function CommercialFunnel({ funnel, sync, allAccounts, accounts, monthly, daily, range, today }) {
+  const [basisPick, setBasisPick] = useState(null)
+  const brandIds = useMemo(() => new Set(allAccounts.filter(a => a.sync_status === 'ok' && (!sync?.brand || a.brand === sync.brand)).map(a => a.id)), [allAccounts, sync?.brand])
+  const spendBy = useMemo(() => spendByMonth(monthly, daily, brandIds), [monthly, daily, brandIds])
+  const visible = new Set(accounts.map(a => a.id))
+  const otherBrand = accounts.length > 0 && ![...visible].some(id => brandIds.has(id))
+  const subset = !otherBrand && [...brandIds].some(id => !visible.has(id))
+
+  if (otherBrand) {
+    return (
+      <Card className="p-4 text-sm text-foreground-muted">
+        <h2 className="mb-1 text-sm font-semibold text-foreground">Embudo comercial</h2>
+        Por ahora el embudo de reuniones y ventas está conectado solo para {sync?.brand || 'la marca principal'}.
+      </Card>
+    )
+  }
+
+  const cohortMonths = new Set(funnel.filter(f => f.basis === 'cohorte').map(f => f.month))
+  const allMonths = [...new Set(funnel.map(f => f.month))].sort()
+  const sel = range ? allMonths.filter(m => m >= monthStartOf(range.since) && m <= monthStartOf(range.until)) : allMonths
+  const basis = basisPick || (sel.length && sel.every(m => cohortMonths.has(m)) ? 'cohorte' : 'agenda')
+  const rows = funnel.filter(f => f.basis === basis && sel.includes(f.month))
+  const tot = k => rows.reduce((s, r) => s + Number(r[k] || 0), 0)
+  const isOpen = m => m >= monthStartOf(addDays(today, -15))
+
+  // KPIs de costo: solo meses que tienen gasto cargado
+  const withSpend = rows.filter(r => spendBy[r.month]?.spend > 0)
+  const spend = withSpend.reduce((s, r) => s + spendBy[r.month].spend, 0)
+  const messages = rows.reduce((s, r) => s + (spendBy[r.month]?.messages || 0), 0)
+  const kSales = basis === 'cohorte' ? 'sales' : 'sales_in_month'
+  const salesWithSpend = withSpend.reduce((s, r) => s + Number(r[kSales] || 0), 0)
+  const scheduledWithSpend = withSpend.reduce((s, r) => s + Number(r.scheduled || 0), 0)
+  const revenueWithSpend = withSpend.reduce((s, r) => s + Number(r.revenue_contracted || 0), 0)
+  const revenue = tot('revenue_contracted')
+  const ticketBase = basis === 'cohorte' ? tot('sales') : tot('sales_with_amount')
+
+  const top = basis === 'cohorte' ? tot('new_contacts') : messages
+  const steps = [
+    [basis === 'cohorte' ? 'Escribieron por primera vez' : 'Conversaciones de WhatsApp', top, basis === 'cohorte' ? `${num(messages)} conversaciones en Meta` : 'Meta Ads'],
+    ['Agendaron reunión', tot('scheduled'), basis === 'cohorte'
+      ? `${pctOf(tot('scheduled'), top)} de quienes escribieron`
+      : `${pctOf(scheduledWithSpend, messages)} de las conversaciones${withSpend.length < rows.length ? ' (meses con inversión)' : ''}`],
+    ['Asistieron', tot('attended'), `${pctOf(tot('attended'), tot('scheduled'))} de los agendados`],
+    ['Aptos', tot('eligible'), `${pctOf(tot('eligible'), tot('attended'))} de los asistentes`],
+    ['Contrataron', tot('sales'), `${pctOf(tot('sales'), tot('attended'))} de los asistentes`],
+  ]
+  const lastDay = sel.length ? (monthEndOf(sel.at(-1)) > today ? today : monthEndOf(sel.at(-1))) : null
+  const partial = range && sel.length && (range.since > sel[0] || range.until < lastDay)
+  const anyOpen = sel.some(isOpen)
+
+  return (
+    <Card className="p-4">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Embudo comercial · de la conversación a la venta</h2>
+        <div className="flex rounded-lg border border-border p-0.5 text-xs">
+          {Object.entries(BASIS).map(([k, l]) => (
+            <button key={k} onClick={() => setBasisPick(k)} className={cx('rounded-md px-3 py-1', basis === k ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground')}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <p className="mb-3 text-xs text-foreground-muted">
+        {basis === 'cohorte'
+          ? 'Personas nuevas que escribieron por WhatsApp en el período y lo que pasó después con cada una (clientes antiguos excluidos).'
+          : 'Reuniones agendadas en el período. Incluye a quienes llegaron por otros canales.'}
+        {sel.length > 0 && <> {sel.length === 1 ? monthName(sel[0]) : `${monthName(sel[0])} a ${monthName(sel.at(-1))}`}.</>}
+        {anyOpen && <> <Badge color="#F59E0B">en curso: aún pueden cerrar más ventas</Badge></>}
+      </p>
+
+      {rows.length === 0 ? (
+        <p className="rounded-lg border border-border p-3 text-sm text-foreground-muted">
+          No hay datos comerciales {basis === 'cohorte' ? 'por primer contacto ' : ''}para este período.
+          {basis === 'cohorte' && sync?.hibot_since && <> Los datos de WhatsApp parten el {dayName(sync.hibot_since)}.</>}
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {steps.map(([label, value, sub], i) => (
+              <div key={label} className="relative rounded-lg border border-border p-3">
+                <p className="text-[11px] text-foreground-muted">{label}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">{num(value)}</p>
+                <p className="text-[11px] text-foreground-subtle">{sub}</p>
+                {i > 0 && <ChevronRight size={14} className="absolute -left-2.5 top-1/2 hidden -translate-y-1/2 text-foreground-subtle sm:block" />}
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <Mini label="Costo por reunión agendada" value={clp(per(spend, scheduledWithSpend))} sub="inversión / reuniones" />
+            <Mini label="Costo por cliente" value={clp(per(spend, salesWithSpend))} sub={basis === 'cohorte' ? 'lo que cuesta en publicidad cada cliente' : 'inversión / ventas cerradas en el período'} />
+            <Mini label="Ticket promedio" value={clp(per(revenue, ticketBase))} sub="honorarios contratados por cliente" />
+            <Mini label="Retorno de la inversión" value={ratio(revenueWithSpend, spend)} sub={spend ? `por cada $1 en Meta se contrataron $${ratio(revenueWithSpend, spend).replace('×', '')}` : 'sin gasto cargado en estos meses'} />
+          </div>
+          {(partial || subset || withSpend.length < rows.length) && (
+            <ul className="mt-2 space-y-0.5 text-[11px] text-foreground-subtle">
+              {partial && <li>· Los datos comerciales son mensuales: se muestran los meses completos.</li>}
+              {subset && <li>· El embudo es del total {sync?.brand || ''}: las ventas no se pueden separar por cuenta publicitaria, y los costos usan la inversión de todas sus cuentas.</li>}
+              {withSpend.length < rows.length && <li>· Algunos meses no tienen inversión cargada: los costos y el retorno consideran solo los meses con inversión.</li>}
+            </ul>
+          )}
+        </>
+      )}
+
+      <FunnelByMonth funnel={funnel} basis={basis} spendBy={spendBy} selected={new Set(sel)} isOpen={isOpen} />
+
+      {sync && (
+        <p className="mt-3 text-[11px] text-foreground-subtle">
+          Reuniones y ventas: Airtable{sync.airtable_at ? ` (actualizado ${new Date(sync.airtable_at).toLocaleDateString('es-CL')})` : ''}.
+          {sync.hibot_since && <> WhatsApp: HiBot, del {dayName(sync.hibot_since)} al {dayName(sync.hibot_until)}.</>}
+          {' '}Todavía no es posible saber de qué anuncio viene cada cliente.
+        </p>
+      )}
+    </Card>
+  )
+}
+const per = (a, b) => (a && b ? a / b : null)
+
+function FunnelByMonth({ funnel, basis, spendBy, selected, isOpen }) {
+  const rows = funnel.filter(f => f.basis === basis).sort((a, b) => a.month.localeCompare(b.month))
+  const kSales = basis === 'cohorte' ? 'sales' : 'sales_in_month'
+  const withCac = rows.map(r => ({ ...r, spend: spendBy[r.month]?.spend || null, cac: per(spendBy[r.month]?.spend, r[kSales]) }))
+  const colorOf = (r, i) => {
+    const ref = median(withCac.slice(Math.max(0, i - 3), i).map(x => x.cac))
+    if (!r.cac || !ref) return undefined
+    return r.cac < ref ? '#22C55E' : r.cac > ref * 1.2 ? '#EF4444' : undefined
+  }
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full min-w-[720px] text-xs">
+        <thead className="text-left text-foreground-muted">
+          <tr className="border-b border-border">
+            <th className="py-2 pr-2 font-medium">Mes</th>
+            <th className="px-2 text-right font-medium">Inversión</th>
+            {basis === 'cohorte' && <th className="px-2 text-right font-medium">Nuevos</th>}
+            <th className="px-2 text-right font-medium">Agendaron</th>
+            <th className="px-2 text-right font-medium">Asistieron</th>
+            <th className="px-2 text-right font-medium">Aptos</th>
+            <th className="px-2 text-right font-medium">{basis === 'cohorte' ? 'Contrataron' : 'Ventas del mes'}</th>
+            <th className="px-2 text-right font-medium">Costo por cliente</th>
+            <th className="px-2 text-right font-medium">Contratado</th>
+            <th className="pl-2 text-right font-medium">Retorno</th>
+          </tr>
+        </thead>
+        <tbody>
+          {withCac.map((r, i) => ({ r, i })).reverse().map(({ r, i }) => (
+            <tr key={r.month} className={cx('border-b border-border/60 tabular-nums', !selected.has(r.month) && 'opacity-50')}>
+              <td className="py-1.5 pr-2"><span className="capitalize">{monthName(r.month)}</span> {isOpen(r.month) && <Badge color="#F59E0B">en curso</Badge>}</td>
+              <td className="px-2 text-right">{r.spend ? clp(r.spend) : '—'}</td>
+              {basis === 'cohorte' && <td className="px-2 text-right">{num(r.new_contacts)}</td>}
+              <td className="px-2 text-right">{num(r.scheduled)}</td>
+              <td className="px-2 text-right">{num(r.attended)}</td>
+              <td className="px-2 text-right">{num(r.eligible)}</td>
+              <td className="px-2 text-right">{num(r[kSales])}</td>
+              <td className="px-2 text-right font-medium" style={{ color: colorOf(r, i) }}>{clp(r.cac)}</td>
+              <td className="px-2 text-right">{clp(r.revenue_contracted == null ? null : Number(r.revenue_contracted))}</td>
+              <td className="pl-2 text-right">{ratio(Number(r.revenue_contracted), r.spend)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1.5 text-[11px] text-foreground-subtle">Costo por cliente en verde: mejor que la mediana de los 3 meses anteriores; en rojo: más de 20% peor.</p>
+    </div>
   )
 }
 

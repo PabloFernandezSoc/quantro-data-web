@@ -13,7 +13,9 @@ Todo lo que analices, propongas o cambies se registra en la **bitácora** (`ad_o
 
 Anuncio (video) → conversación de WhatsApp → un ejecutivo atiende → **reunión agendada** → evaluación: ¿**apto** para liquidación o renegociación? → propuesta (honorarios, valor total) → **venta**.
 
-Hoy optimizamos a *conversaciones iniciadas*, pero la métrica que importa es el **costo por venta**. El CRM está en Airtable (bases "Administración tus deudas" y "Cobranza"). Mientras no esté conectado, no declares ganador a un video solo por costo por conversación: menciona que falta la calidad del lead.
+Hoy optimizamos a *conversaciones iniciadas*, pero la métrica que importa es el **costo por cliente (CAC)**. El CRM está en Airtable (base "Administración TusDeudas", tabla **Admisión**; montos en las cuotas de "Cobranza TusDeudas") y el embudo mensual ya está en Supabase (`crm_funnel_monthly`, ver abajo). Todavía **no hay atribución por anuncio** (HiBot no entrega el anuncio de origen): no declares ganador a un video solo por costo por conversación; compáralo con el CAC del mes.
+
+Referencia (cohorte por mes de primer mensaje, cuentas Tus Deudas): ago-2026 CAC $160.461 · sep $172.586 · oct $228.750. Ticket contratado mediano ~$500.000. Meta mientras no haya datos por anuncio: **CAC ≤ $180.000 y retorno ≥ 3×**.
 
 ## Cuentas
 
@@ -81,6 +83,7 @@ Supabase MCP, proyecto **Quantrodataweb** (`project_id: mcgogmldiuejqrqfgwbd`).
 4. Actualiza `ad_accounts`: `sync_status = 'ok'`, `synced_at = now()` y `sync_note` (null si está todo completo).
 5. Verifica que la suma de `ad_ads.spend` por cuenta cuadre con el total de Meta en período Máximo. Si no cuadra, faltan anuncios archivados.
 6. Registra en la bitácora un `sync` con el resumen: gasto y conversaciones de la semana, comparación con la semana anterior y el mejor y peor video.
+7. **Embudo comercial (mensual)**: el cruce vive en la carpeta local `Proyectos Claude/Tus deudas` (README y `app-integration/README.md`). Pídele a Pablo la exportación de Auditoría de HiBot del mes (`app.hibot.us/conversation` → Exportar) en `data/raw/hibot/`, luego `npm run airtable:export && npm run todo` y sube `crm_funnel_monthly` + `crm_sync` (upsert por `client_id, month, basis`). Todo en Airtable y HiBot es **solo lectura**. Menciona en la bitácora el CAC del mes y si la cohorte sigue abierta.
 
 ## Bitácora (`ad_ops_log`)
 
@@ -98,6 +101,8 @@ Para cerrar una propuesta: `update public.ad_ops_log set status = 'aplicada' whe
 - [x] Campaña de tráfico de la cuenta 1371554021238141: pausada el 16-nov con OK de Pablo.
 - [ ] **Cargar `ad_daily` de la cuenta principal (1577892457195625) y de Tus Pensiones**: sin eso, el filtro por días y los anuncios ganadores de la cuenta principal usan solo totales acumulados.
 - [x] Desglose mensual de la cuenta principal y de Tus Pensiones (cargado).
-- [ ] Conectar Airtable para cerrar el embudo (reuniones, aptos, ventas) y calcular el costo por venta por video.
+- [x] Conectar Airtable para cerrar el embudo (reuniones, aptos, ventas): `crm_funnel_monthly` cargado el 19-nov-2026 (agenda oct-25→nov-26, cohorte ago→nov-26).
+- [ ] Costo por venta **por video**: preguntar a soporte HiBot si guardan el `referral` (ad_id / ctwa_clid) de los anuncios de WhatsApp.
+- [ ] Validar con el equipo por qué oct-2026 tiene ~116 ventas (promedio ~200): ¿ventas sin registrar en Airtable?
 - [ ] Volver a subir conversiones a Meta (Conversions API o carga manual de eventos offline, como en Buspei) para optimizar a leads de calidad.
 - [ ] Mensajes respaldo (943668171465617): regularizar el saldo impago.

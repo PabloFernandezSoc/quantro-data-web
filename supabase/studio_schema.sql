@@ -560,3 +560,81 @@ create policy "ad_daily_select" on public.ad_daily for select to authenticated
 create policy "ad_daily_admin" on public.ad_daily for all to authenticated using (public.is_admin()) with check (public.is_admin());
 -- Cobertura del detalle diario por cuenta (null = sin detalle diario: la app usa el total mensual)
 alter table public.ad_accounts add column if not exists daily_since date, add column if not exists daily_until date;
+
+-- ─────────────────────────────────────────────────────────────
+-- Embudo comercial (/app/publicidad): Meta Ads → WhatsApp (HiBot) → Airtable
+-- Agregar al final de supabase/studio_schema.sql de quantro-data-web.
+-- Carga: scripts/sync-supabase.mjs (carpeta "Tus deudas") o, más adelante, api/crm-sync.js.
+-- ─────────────────────────────────────────────────────────────
+
+-- 1) Embudo agregado por mes. Lo ve el cliente (rol client/ads). Sin datos personales.
+--    basis = 'agenda'  → mes en que se agendó la reunión (Airtable), cubre todo el histórico
+--    basis = 'cohorte' → mes del primer contacto en WhatsApp (HiBot), solo meses con exportación
+create table if not exists public.crm_funnel_monthly (
+  client_id            uuid not null references public.clients (id) on delete cascade,
+  month                date not null check (extract(day from month) = 1),
+  basis                text not null check (basis in ('agenda', 'cohorte')),
+  new_contacts         int,             -- cohorte: teléfonos nuevos en WhatsApp (sin clientes antiguos)
+  returning_contacts   int,             -- cohorte: contactos ya existentes (excluidos del embudo)
+  scheduled            int not null default 0,
+  attended             int not null default 0,
+  eligible             int not null default 0,
+  proposals            int not null default 0,
+  sales                int not null default 0,   -- ventas de las personas de ese mes/cohorte
+  sales_in_month       int,                      -- agenda: ventas con fecha de venta en el mes
+  revenue_contracted   numeric,                  -- suma de cuotas de las ventas (CLP)
+  revenue_paid         numeric,                  -- cuotas pagadas a la fecha
+  sales_with_amount    int,
+  median_days_to_sale  int,
+  hibot_match_pct      numeric,                  -- % de agendados que aparecen en HiBot
+  meta_source_pct      numeric,                  -- % que declara venir de Instagram/Facebook
+  synced_at            timestamptz not null default now(),
+  primary key (client_id, month, basis)
+);
+alter table public.crm_funnel_monthly enable row level security;
+create policy "crm_funnel_select" on public.crm_funnel_monthly for select to authenticated using (public.can_view_ads(client_id));
+create policy "crm_funnel_admin"  on public.crm_funnel_monthly for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- 2) Detalle por lead. SOLO ADMIN: contiene datos personales seudonimizados.
+--    phone_hash = sha256 del teléfono normalizado '569XXXXXXXX' (mismo formato que pide Meta CAPI).
+--    No se guarda nombre, RUT ni teléfono en claro.
+create table if not exists public.crm_leads (
+  client_id          uuid not null references public.clients (id) on delete cascade,
+  phone_hash         text not null,
+  first_contact_at   timestamptz,      -- primer mensaje en HiBot (dentro de las exportaciones cargadas)
+  first_channel      text,
+  tags               text[],
+  is_returning       boolean not null default false,
+  scheduled_at       timestamptz,
+  attended           boolean not null default false,
+  eligible           boolean not null default false,
+  proposal           boolean not null default false,
+  won_at             date,
+  product            text,
+  amount             numeric,
+  amount_paid        numeric,
+  declared_source    text,             -- "Cómo supiste de nosotros"
+  ad_id              text,             -- si algún día HiBot entrega el referral del anuncio
+  capi_sent_at       timestamptz,      -- control de envío a Meta Conversions API (fase 2)
+  synced_at          timestamptz not null default now(),
+  primary key (client_id, phone_hash)
+);
+create index if not exists crm_leads_won_idx on public.crm_leads (client_id, won_at);
+alter table public.crm_leads enable row level security;
+create policy "crm_leads_admin" on public.crm_leads for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- 3) Estado de la sincronización (para mostrar "datos al …" en la página)
+create table if not exists public.crm_sync (
+  client_id      uuid primary key references public.clients (id) on delete cascade,
+  hibot_since    date,
+  hibot_until    date,
+  airtable_at    timestamptz,
+  note           text,
+  synced_at      timestamptz not null default now()
+);
+alter table public.crm_sync enable row level security;
+create policy "crm_sync_select" on public.crm_sync for select to authenticated using (public.can_view_ads(client_id));
+create policy "crm_sync_admin"  on public.crm_sync for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Marca a la que corresponde el embudo (para calcular costos solo con sus cuentas)
+alter table public.crm_sync add column if not exists brand text;
