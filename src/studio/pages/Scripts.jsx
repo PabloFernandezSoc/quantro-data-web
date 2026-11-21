@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BookOpenText } from 'lucide-react'
-import { useStudio, openPiece } from '../lib/store'
+import { useStudio, openPiece, setPieceNav } from '../lib/store'
 import { useGrid } from '../lib/useGrid'
 import { parseScript, speakersOf, matchSpeaker } from '../lib/script'
 import { shortDate, monthLabel } from '../lib/dates'
@@ -35,6 +35,7 @@ export default function Scripts() {
     (pieceId === 'all' || p.id === pieceId) &&
     (!pendingOnly || ['idea', 'aprobada', 'en_grabacion'].includes(p.status)),
   )
+  useEffect(() => { setPieceNav(visible.map(p => p.id)) }, [visible])
 
   return (
     <div>

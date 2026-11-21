@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Inbox } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { q, PIECE_SELECT } from '../lib/api'
-import { useStudio, openPiece } from '../lib/store'
+import { useStudio, openPiece, setPieceNav } from '../lib/store'
 import { deadlines, shortDate } from '../lib/dates'
 import { Card, PageHeader, Empty, Spinner, ErrorNote, DueBadge, Avatar, PartBadge, LinkOut } from '../components/ui'
 import { ReviewActions } from '../components/Actions'
@@ -25,6 +25,7 @@ export default function ReviewQueue() {
   }, [canEdit])
 
   useEffect(() => { load() }, [load, version])
+  useEffect(() => { if (pieces) setPieceNav(pieces.map(p => p.id)) }, [pieces])
 
   if (!pieces) return error ? <ErrorNote>{error}</ErrorNote> : <Spinner />
 
