@@ -66,7 +66,7 @@ function aggregateDaily(daily, adsById) {
 
 // Publicidad: inversión en Meta Ads por cliente, seguimiento del mes y anuncios ganadores
 export default function Ads() {
-  const { adsClients: clients, clientId: lastClientId, setClientId } = useStudio()
+  const { adsClients: clients, clientId: lastClientId, setClientId, isAdmin } = useStudio()
   const clientId = clients.some(c => c.id === lastClientId) ? lastClientId : clients[0]?.id || ''
   const today = iso(new Date())
   const [data, setData] = useState(null)
@@ -83,9 +83,9 @@ export default function Ads() {
     setData(null)
     ;(async () => {
       try {
-        const accounts = await q(supabase.from('ad_accounts').select('*').eq('client_id', clientId).order('name'))
-        const ids = accounts.map(a => a.id)
-        const [monthly, ads, daily, log, funnel, crmSync, weekly, events] = await Promise.all([
+        const rawAccounts = await q(supabase.from('ad_accounts').select('*').eq('client_id', clientId).order('name'))
+        const ids = rawAccounts.map(a => a.id)
+        const [monthly, ads, daily, log, funnel, crmSync, weekly, events, profiles, profileFunnel] = await Promise.all([
           ids.length ? q(supabase.from('ad_monthly').select('*').in('account_id', ids).order('month')) : [],
           ids.length ? q(supabase.from('ad_ads').select('*').in('account_id', ids)) : [],
           ids.length ? fetchAll(() => supabase.from('ad_daily').select('*').in('account_id', ids).order('date')) : [],
@@ -94,8 +94,14 @@ export default function Ads() {
           q(supabase.from('crm_sync').select('*').eq('client_id', clientId)),
           q(supabase.from('crm_funnel_weekly').select('*').eq('client_id', clientId).order('week')),
           q(supabase.from('ad_events').select('*').eq('client_id', clientId).order('date')),
+          q(supabase.from('ad_profiles').select('*').eq('client_id', clientId).order('sort')),
+          q(supabase.from('crm_funnel_profile_monthly').select('*').eq('client_id', clientId).order('month')),
         ])
-        if (alive) { setData({ accounts, monthly, ads, daily, log, funnel, crmSync: crmSync[0] || null, weekly, events }); setError(null) }
+        // Los nombres de cuenta en Meta se prestan a confusión: se identifican por su Instagram
+        const igByAccount = Object.fromEntries(profiles.flatMap(p => p.account_ids.map(id => [id, p.instagram])))
+        const accounts = rawAccounts.map(a => ({ ...a, meta_name: a.name, instagram: igByAccount[a.id] || null, name: igByAccount[a.id] ? `@${igByAccount[a.id]} · ${a.name}` : a.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+        if (alive) { setData({ accounts, monthly, ads, daily, log, funnel, crmSync: crmSync[0] || null, weekly, events, profiles, profileFunnel }); setError(null) }
       } catch (e) {
         if (alive) setError(e.message)
       }
@@ -232,6 +238,11 @@ export default function Ads() {
 
           <MonthToDate monthly={view.monthly} daily={view.daily} accounts={view.accounts} today={today} />
 
+          {data.profiles.length > 0 && (
+            <InstagramProfiles profiles={data.profiles} funnel={data.profileFunnel} monthly={data.monthly} daily={data.daily} range={range} today={today} isAdmin={isAdmin}
+              onCardSaved={(instagram, card_last4) => setData(d => ({ ...d, profiles: d.profiles.map(p => p.instagram === instagram ? { ...p, card_last4 } : p) }))} />
+          )}
+
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Inversión" value={clp(view.spend)} sub={periodLabel} />
             <Stat label="Conversaciones de WhatsApp" value={num(view.messages)} sub="iniciadas desde anuncios" />
@@ -278,7 +289,7 @@ export default function Ads() {
             ? <>
                 <CommercialFunnel funnel={data.funnel} sync={data.crmSync} allAccounts={data.accounts} accounts={view.accounts} monthly={data.monthly} daily={data.daily} range={range} today={today} />
                 <FunnelEvolution weekly={data.weekly} funnel={data.funnel} events={data.events} accounts={data.accounts} range={range} today={today} />
-                <SpendMixAndCac funnel={data.funnel} sync={data.crmSync} accounts={data.accounts} monthly={data.monthly} daily={data.daily} events={data.events} range={range} today={today} />
+                <SpendMixAndCac profiles={data.profiles} funnel={data.funnel} sync={data.crmSync} accounts={data.accounts} monthly={data.monthly} daily={data.daily} events={data.events} range={range} today={today} />
               </>
             : <FunnelPreview messages={view.messages} />}
 
@@ -1052,21 +1063,22 @@ function FunnelEvolution({ weekly, funnel, events, accounts, range, today }) {
 
 // ── Inversión por cuenta (barras apiladas) y costo por cliente, mes a mes ──
 const ACCOUNT_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500'] // validados para fondo oscuro (CVD y contraste)
-function SpendMixAndCac({ funnel, sync, accounts, monthly, daily, events, range, today }) {
+function SpendMixAndCac({ profiles = [], funnel, sync, accounts, monthly, daily, events, range, today }) {
   const [hover, setHover] = useState(null)
   const brandAccounts = accounts.filter(a => a.sync_status === 'ok' && (!sync?.brand || a.brand === sync.brand))
   const ids = new Set(brandAccounts.map(a => a.id))
   const months = [...new Set(monthly.filter(m => ids.has(m.account_id)).map(m => m.month))].sort()
   if (!months.length) return null
   const perAcc = {}
-  for (const a of brandAccounts) {
-    const s = spendByMonth(monthly, daily, new Set([a.id]))
-    perAcc[a.id] = s
-  }
+  // Con perfiles cargados se agrupa por Instagram; si no, por cuenta publicitaria
+  const groups = profiles.length
+    ? profiles.map(p => ({ id: p.instagram, name: `@${p.instagram}`, ids: new Set(p.account_ids) }))
+    : brandAccounts.map(a => ({ id: a.id, name: a.name, ids: new Set([a.id]) }))
+  for (const g of groups) perAcc[g.id] = spendByMonth(monthly, daily, g.ids)
   // Orden fijo: cuenta con más inversión total primero (el color sigue a la cuenta, no al ranking del mes)
-  const order = brandAccounts.map(a => ({ a, total: months.reduce((s, m) => s + (perAcc[a.id][m]?.spend || 0), 0) }))
-    .filter(x => x.total > 0).sort((x, y) => y.total - x.total).map(x => x.a)
-  const color = Object.fromEntries(order.map((a, i) => [a.id, ACCOUNT_COLORS[i] || '#8A8F98']))
+  const order = groups.map(a => ({ a, total: months.reduce((s, m) => s + (perAcc[a.id][m]?.spend || 0), 0) }))
+    .filter(x => x.total > 0).sort((x, y) => (profiles.length ? 0 : y.total - x.total)).map(x => x.a)
+  const color = Object.fromEntries(groups.map((a, i) => [a.id, ACCOUNT_COLORS[i] || '#8A8F98']))
   const totalOf = m => order.reduce((s, a) => s + (perAcc[a.id][m]?.spend || 0), 0)
   const max = Math.max(...months.map(totalOf), 1)
   const sel = m => !range || (monthEndOf(m) >= range.since && m <= range.until)
@@ -1082,12 +1094,12 @@ function SpendMixAndCac({ funnel, sync, accounts, monthly, daily, events, range,
   const hm = hover != null ? months[hover] : null
   return (
     <Card className="p-4">
-      <h2 className="text-sm font-semibold">Inversión por cuenta y costo por cliente</h2>
-      <p className="mb-3 text-xs text-foreground-muted">Cómo se repartió la inversión entre cuentas cada mes, y cuánto costó cada cliente nuevo en ese mes.</p>
+      <h2 className="text-sm font-semibold">Inversión por Instagram y costo por cliente</h2>
+      <p className="mb-3 text-xs text-foreground-muted">Cómo se repartió la inversión entre perfiles cada mes, y cuánto costó cada cliente nuevo en total.</p>
       <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
         <div className="rounded-lg border border-border p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-xs text-foreground-muted">Inversión mensual por cuenta</p>
+            <p className="text-xs text-foreground-muted">Inversión mensual por Instagram</p>
             <p className="text-sm font-semibold tabular-nums">{clp(totalOf(hm || months.at(-1)))} <span className="text-[11px] font-normal text-foreground-subtle">{monthName(hm || months.at(-1))}</span></p>
           </div>
           <div className="mt-2 flex h-40 items-end gap-2" onMouseLeave={() => setHover(null)}>
@@ -1119,6 +1131,159 @@ function SpendMixAndCac({ funnel, sync, accounts, monthly, daily, events, range,
         <MiniChart title="Costo por cliente nuevo" points={cacPoints} fmt={clp} hover={hover} setHover={setHover} eventsAt={eventsAt}
           note="Meses con primer contacto en WhatsApp (desde ago-26) usan cohorte; antes, ventas cerradas en el mes." />
       </div>
+    </Card>
+  )
+}
+
+// ── Panel por perfil de Instagram: estado de pago, inversión y embudo de cada uno ──
+const PAYMENT_STATE = {
+  ACTIVE: ['Cuenta activa', '#22C55E'],
+  IN_GRACE_PERIOD: ['Pago en período de gracia', '#F59E0B'],
+  UNSETTLED: ['Saldo impago', '#EF4444'],
+  DISABLED: ['Cuenta deshabilitada', '#EF4444'],
+}
+
+function profileStats(p, funnel, monthly, daily, months) {
+  const spendBy = spendByMonth(monthly, daily, new Set(p.account_ids))
+  const rows = funnel.filter(f => f.instagram === p.instagram && months.includes(f.month))
+  const tot = k => rows.reduce((s, r) => s + Number(r[k] || 0), 0)
+  const spend = months.reduce((s, m) => s + (spendBy[m]?.spend || 0), 0)
+  const messages = months.reduce((s, m) => s + (spendBy[m]?.messages || 0), 0)
+  return {
+    spend, messages, contacts: tot('new_contacts'), scheduled: tot('scheduled'), attended: tot('attended'),
+    eligible: tot('eligible'), sales: tot('sales'), revenue: tot('revenue_contracted'),
+  }
+}
+
+function CardLast4({ profile, isAdmin, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(profile.card_last4 || '')
+  const [error, setError] = useState(null)
+  const save = async () => {
+    if (value && !/^\d{4}$/.test(value)) { setError('Solo 4 dígitos'); return }
+    const card_last4 = value || null
+    const { error: e } = await supabase.from('ad_profiles').update({ card_last4 }).eq('client_id', profile.client_id).eq('instagram', profile.instagram)
+    if (e) { setError(e.message); return }
+    setError(null); setEditing(false); onSaved(profile.instagram, card_last4)
+  }
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <input aria-label={`Últimos 4 dígitos de la tarjeta de ${profile.instagram}`} value={value} inputMode="numeric" maxLength={4} autoComplete="off"
+          onChange={e => setValue(e.target.value.replace(/\D/g, ''))} className="h-6 w-14 rounded border border-border bg-transparent px-1 text-xs tabular-nums" />
+        <button onClick={save} className="text-accent">Guardar</button>
+        {error && <span className="text-red">{error}</span>}
+      </span>
+    )
+  }
+  return (
+    <span className="tabular-nums">
+      {profile.card_last4 ? `•••• ${profile.card_last4}` : 'Sin registrar'}
+      {isAdmin && <button onClick={() => setEditing(true)} className="ml-1.5 text-accent">Editar</button>}
+    </span>
+  )
+}
+
+function ProfileCard({ p, s, color, isAdmin, onCardSaved }) {
+  const state = p.has_payment_method === false ? ['Sin método de pago', '#EF4444'] : PAYMENT_STATE[p.account_status] || [p.account_status || 'Sin revisar', '#8A8F98']
+  const stages = [['Escribieron', s.contacts], ['Agendaron', s.scheduled], ['Asistieron', s.attended], ['Aptos', s.eligible], ['Contrataron', s.sales]]
+  const gap = s.messages >= 50 && s.contacts < s.messages * 0.5
+  return (
+    <div className="flex min-w-0 flex-col rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color }} />
+          <span className="truncate">@{p.instagram}</span>
+        </p>
+        <Badge color={state[1]}>{state[0]}</Badge>
+      </div>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+        <dt className="text-foreground-subtle">WhatsApp</dt><dd className="text-foreground-muted">{p.whatsapp.join(' · ')}</dd>
+        <dt className="text-foreground-subtle">Tarjeta</dt><dd className="text-foreground-muted"><CardLast4 profile={p} isAdmin={isAdmin} onSaved={onCardSaved} /></dd>
+        <dt className="text-foreground-subtle">Presupuesto</dt><dd className="text-foreground-muted">{clp(Number(p.daily_budget))} al día</dd>
+        <dt className="text-foreground-subtle">Cuenta Meta</dt><dd className="truncate text-foreground-muted" title={p.portfolio}>{p.ad_account_id}</dd>
+      </dl>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <div><p className="text-[11px] text-foreground-muted">Inversión</p><p className="text-sm font-semibold tabular-nums">{clp(s.spend)}</p></div>
+        <div><p className="text-[11px] text-foreground-muted">Costo por cliente</p><p className="text-sm font-semibold tabular-nums">{s.sales ? clp(s.spend / s.sales) : '—'}</p></div>
+        <div><p className="text-[11px] text-foreground-muted">Retorno</p><p className="text-sm font-semibold tabular-nums">{ratio(s.revenue, s.spend)}</p></div>
+      </div>
+      <div className="mt-3 space-y-1">
+        {stages.map(([label, value], i) => (
+          <div key={label} className="grid grid-cols-[4.75rem_1fr_3.25rem] items-center gap-2 text-[11px]">
+            <span className="text-foreground-muted">{label}</span>
+            <span className="h-2 overflow-hidden rounded-sm bg-white/5">
+              <span className="block h-full rounded-sm" style={{ width: `${s.contacts ? Math.max(value ? 1.5 : 0, (value / s.contacts) * 100) : 0}%`, background: color, opacity: 1 - i * 0.08 }} />
+            </span>
+            <span className="text-right font-medium tabular-nums">{num(value)}</span>
+          </div>
+        ))}
+      </div>
+      {gap && (
+        <p className="mt-2 flex gap-1.5 rounded-md bg-amber/10 p-2 text-[11px] text-amber">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          Meta reporta {num(s.messages)} conversaciones y HiBot registra {num(s.contacts)} contactos nuevos en esta línea. Hay que revisar a qué WhatsApp llegan los anuncios.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function InstagramProfiles({ profiles, funnel, monthly, daily, range, today, isAdmin, onCardSaved }) {
+  const allMonths = [...new Set(funnel.map(f => f.month))].sort()
+  const months = range ? allMonths.filter(m => m >= monthStartOf(range.since) && m <= monthStartOf(range.until)) : allMonths
+  const stats = profiles.map(p => ({ p, s: profileStats(p, funnel, monthly, daily, months) }))
+  const other = funnel.filter(f => f.instagram === 'otras' && months.includes(f.month)).reduce((s, r) => ({ contacts: s.contacts + r.new_contacts, sales: s.sales + r.sales }), { contacts: 0, sales: 0 })
+  const open = months.some(m => m >= monthStartOf(addDays(today, -15)))
+  const period = !months.length ? '' : months.length === 1 ? monthName(months[0]) : `${monthName(months[0])} a ${monthName(months.at(-1))}`
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Resultados por perfil de Instagram</h2>
+        {open && <Badge color="#F59E0B">mes en curso: aún pueden cerrar más ventas</Badge>}
+      </div>
+      <p className="mb-3 text-xs text-foreground-muted">
+        Cada persona se asigna al perfil según la línea de WhatsApp donde escribió por primera vez. {period && `Período: ${period}.`} La inversión suma todas las cuentas publicitarias de cada perfil.
+      </p>
+      {!months.length ? (
+        <p className="rounded-lg border border-border p-3 text-sm text-foreground-muted">No hay datos comerciales por perfil para este período.</p>
+      ) : (
+        <>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {stats.map(({ p, s }, i) => <ProfileCard key={p.instagram} p={p} s={s} color={ACCOUNT_COLORS[i]} isAdmin={isAdmin} onCardSaved={onCardSaved} />)}
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-xs">
+              <thead className="text-left text-foreground-muted">
+                <tr className="border-b border-border">
+                  <th className="py-2 pr-2 font-medium">Instagram</th>
+                  {['Inversión', 'Escribieron', '% agenda', '% asiste', '% contrata', 'Clientes', 'Costo por cliente', 'Contratado', 'Retorno'].map(h => <th key={h} className="px-2 text-right font-medium">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map(({ p, s }) => (
+                  <tr key={p.instagram} className="border-b border-border/60 tabular-nums">
+                    <td className="py-1.5 pr-2 font-medium">@{p.instagram}</td>
+                    <td className="px-2 text-right">{clp(s.spend)}</td>
+                    <td className="px-2 text-right">{num(s.contacts)}</td>
+                    <td className="px-2 text-right">{pctOf(s.scheduled, s.contacts)}</td>
+                    <td className="px-2 text-right">{pctOf(s.attended, s.scheduled)}</td>
+                    <td className="px-2 text-right">{pctOf(s.sales, s.attended)}</td>
+                    <td className="px-2 text-right">{num(s.sales)}</td>
+                    <td className="px-2 text-right font-medium">{s.sales ? clp(s.spend / s.sales) : '—'}</td>
+                    <td className="px-2 text-right">{s.revenue ? clp(s.revenue) : '—'}</td>
+                    <td className="px-2 text-right">{ratio(s.revenue, s.spend)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-foreground-subtle">
+            {other.contacts > 0 && `${num(other.contacts)} contactos y ${num(other.sales)} clientes entraron por otras líneas y no se asignan a un perfil. `}
+            "% contrata" es sobre quienes asistieron. El saldo disponible de cada tarjeta no lo informa Meta.
+          </p>
+        </>
+      )}
     </Card>
   )
 }
