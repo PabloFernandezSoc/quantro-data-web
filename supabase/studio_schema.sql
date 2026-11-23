@@ -676,3 +676,45 @@ create index if not exists ad_events_client_date_idx on public.ad_events (client
 alter table public.ad_events enable row level security;
 create policy "ad_events_select" on public.ad_events for select to authenticated using (public.can_view_ads(client_id));
 create policy "ad_events_admin"  on public.ad_events for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Perfiles de Instagram: identifican cada operación publicitaria y su embudo
+create table if not exists public.ad_profiles (
+  client_id          uuid not null references public.clients (id) on delete cascade,
+  instagram          text not null,
+  ig_user_id         text,
+  portfolio          text,
+  ad_account_id      text references public.ad_accounts (id) on delete set null,
+  account_ids        text[] not null default '{}',
+  whatsapp           text[] not null default '{}',
+  hibot_channels     text[] not null default '{}',
+  daily_budget       numeric,
+  account_status     text,
+  has_payment_method boolean,
+  status_checked_at  timestamptz,
+  card_last4         text check (card_last4 is null or card_last4 ~ '^[0-9]{4}$'),
+  sort               int not null default 0,
+  primary key (client_id, instagram)
+);
+alter table public.ad_profiles enable row level security;
+create policy "ad_profiles_select" on public.ad_profiles for select to authenticated using (public.can_view_ads(client_id));
+create policy "ad_profiles_admin"  on public.ad_profiles for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create table if not exists public.crm_funnel_profile_monthly (
+  client_id            uuid not null references public.clients (id) on delete cascade,
+  instagram            text not null,
+  month                date not null check (extract(day from month) = 1),
+  new_contacts         int not null default 0,
+  returning_contacts   int not null default 0,
+  scheduled            int not null default 0,
+  attended             int not null default 0,
+  eligible             int not null default 0,
+  proposals            int not null default 0,
+  sales                int not null default 0,
+  revenue_contracted   numeric,
+  median_days_to_sale  int,
+  synced_at            timestamptz not null default now(),
+  primary key (client_id, instagram, month)
+);
+alter table public.crm_funnel_profile_monthly enable row level security;
+create policy "crm_funnel_profile_select" on public.crm_funnel_profile_monthly for select to authenticated using (public.can_view_ads(client_id));
+create policy "crm_funnel_profile_admin"  on public.crm_funnel_profile_monthly for all to authenticated using (public.is_admin()) with check (public.is_admin());
